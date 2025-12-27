@@ -1,7 +1,13 @@
 {
   "teams": [
-    { "name": "L", "who": "user1-11"},
-    { "name": "R", "who": "user1-21"}
+    {
+      "name": "L",
+      "who": "user1-11"
+    },
+    {
+      "name": "R",
+      "who": "user1-21"
+    }
   ],
   "setup": {
     "numPlayers": 3,
@@ -9,6 +15,8 @@
     "useRandomFlags": false
   },
   "servers": {
+    "user1-11": "ws://localhost:8080",
+    "user1-21": "ws://localhost:8081",
     "user0-1": "ws://115.191.4.103:34568",
     "user0-2": "ws://115.191.4.103:34569",
     "user1-1": "ws://115.191.4.103:34571",
