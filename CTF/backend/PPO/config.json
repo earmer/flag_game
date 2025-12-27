@@ -1,0 +1,43 @@
+{
+  "vector_dim": 64,
+  "transformer": {
+    "num_layers": 4,
+    "num_heads": 4,
+    "dropout": 0.1,
+    "mlp_dim": 128
+  },
+  "ppo": {
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "clip_ratio": 0.2,
+    "value_coef": 0.5,
+    "entropy_coef": 0.01,
+    "learning_rate": 0.0003,
+    "batch_size": 128,
+    "epochs": 4,
+    "rollout_steps": 256,
+    "max_steps_per_episode": 400
+  },
+  "reward": {
+    "score": 1.0,
+    "flag_pickup": 0.1,
+    "prison": -0.01
+  },
+  "training": {
+    "save_every_updates": 5
+  },
+  "env": {
+    "init_path": "../example_init.json",
+    "width": 20,
+    "height": 20,
+    "num_players": 3,
+    "num_flags": 6,
+    "prison_duration": 20,
+    "use_random_flags": false,
+    "num_obstacles_1": 8,
+    "num_obstacles_2": 4,
+    "seed": 0,
+    "max_steps": 400
+  },
+  "checkpoint_path": "checkpoints/latest.pt"
+}

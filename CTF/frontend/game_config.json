@@ -4,7 +4,7 @@
     { "name": "R", "who": "user1-21"}
   ],
   "setup": {
-    "numPlayers": 1,
+    "numPlayers": 3,
     "numFlags": 9,
     "useRandomFlags": false
   },
