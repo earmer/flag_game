@@ -1,0 +1,134 @@
+{
+    "action": "status",
+    "time": 11067.9,
+    "myteamPlayer": [
+        {
+            "name": "L0",
+            "team": "L",
+            "hasFlag": false,
+            "posX": 2,
+            "posY": 2,
+            "inPrison": false,
+            "inPrisonTimeLeft": 0,
+            "inPrisonDuration": 20000
+        },
+        {
+            "name": "L1",
+            "team": "L",
+            "hasFlag": false,
+            "posX": 2,
+            "posY": 3,
+            "inPrison": false,
+            "inPrisonTimeLeft": 0,
+            "inPrisonDuration": 20000
+        },
+        {
+            "name": "L2",
+            "team": "L",
+            "hasFlag": false,
+            "posX": 2,
+            "posY": 4,
+            "inPrison": false,
+            "inPrisonTimeLeft": 0,
+            "inPrisonDuration": 20000
+        }
+    ],
+    "myteamFlag": [
+        {
+            "canPickup": true,
+            "posX": 1,
+            "posY": 1
+        },
+        {
+            "canPickup": true,
+            "posX": 1,
+            "posY": 2
+        },
+        {
+            "canPickup": true,
+            "posX": 1,
+            "posY": 3
+        },
+        {
+            "canPickup": true,
+            "posX": 1,
+            "posY": 4
+        },
+        {
+            "canPickup": true,
+            "posX": 1,
+            "posY": 5
+        },
+        {
+            "canPickup": true,
+            "posX": 1,
+            "posY": 6
+        }
+    ],
+    "myteamScore": 0,
+    "opponentPlayer": [
+        {
+            "name": "R0",
+            "team": "R",
+            "hasFlag": false,
+            "posX": 16,
+            "posY": 1,
+            "inPrison": false,
+            "inPrisonTimeLeft": 0,
+            "inPrisonDuration": 20000
+        },
+        {
+            "name": "R1",
+            "team": "R",
+            "hasFlag": false,
+            "posX": 16,
+            "posY": 2,
+            "inPrison": false,
+            "inPrisonTimeLeft": 0,
+            "inPrisonDuration": 20000
+        },
+        {
+            "name": "R2",
+            "team": "R",
+            "hasFlag": false,
+            "posX": 16,
+            "posY": 3,
+            "inPrison": false,
+            "inPrisonTimeLeft": 0,
+            "inPrisonDuration": 20000
+        }
+    ],
+    "opponentFlag": [
+        {
+            "canPickup": true,
+            "posX": 18,
+            "posY": 1
+        },
+        {
+            "canPickup": true,
+            "posX": 18,
+            "posY": 2
+        },
+        {
+            "canPickup": true,
+            "posX": 18,
+            "posY": 3
+        },
+        {
+            "canPickup": true,
+            "posX": 18,
+            "posY": 4
+        },
+        {
+            "canPickup": true,
+            "posX": 18,
+            "posY": 5
+        },
+        {
+            "canPickup": true,
+            "posX": 18,
+            "posY": 6
+        }
+    ],
+    "opponentScore": 0
+}
