@@ -21,10 +21,13 @@
   "reward": {
     "score": 1.0,
     "flag_pickup": 0.1,
-    "prison": -0.01
+    "prison": -0.01,
+    "distance": 0.01,
+    "capture": 0.05
   },
   "training": {
-    "save_every_updates": 5
+    "save_every_updates": 5,
+    "eval_episodes": 5
   },
   "env": {
     "init_path": "../example_init.json",
