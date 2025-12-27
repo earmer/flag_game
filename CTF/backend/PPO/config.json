@@ -15,7 +15,7 @@
     "learning_rate": 0.0003,
     "batch_size": 128,
     "epochs": 4,
-    "rollout_steps": 4096
+    "rollout_steps": 2048
   },
   "reward": {
     "score": 10.0,
@@ -43,7 +43,7 @@
     "num_obstacles_1": 8,
     "num_obstacles_2": 4,
     "seed": 0,
-    "max_steps": 4096
+    "max_steps": 2048
   },
   "checkpoint_path": "checkpoints/latest.pt"
 }
