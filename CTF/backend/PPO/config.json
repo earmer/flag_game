@@ -12,18 +12,17 @@
     "clip_ratio": 0.2,
     "value_coef": 0.5,
     "entropy_coef": 0.01,
-    "learning_rate": 0.0003,
+    "learning_rate": 0.0001,
     "batch_size": 128,
     "epochs": 4,
-    "rollout_steps": 256,
-    "max_steps_per_episode": 400
+    "rollout_steps": 2048
   },
   "reward": {
-    "score": 10.0,
-    "flag_pickup": 1,
-    "prison": -0.1,
-    "distance": 0.1,
-    "capture": 0.05
+    "score": 1.0,
+    "flag_pickup": 0.1,
+    "prison": -0.001,
+    "distance": 0.001,
+    "capture": 0.005
   },
   "training": {
     "save_every_updates": 5,
@@ -44,7 +43,7 @@
     "num_obstacles_1": 8,
     "num_obstacles_2": 4,
     "seed": 0,
-    "max_steps": 400
+    "max_steps": 2048
   },
   "checkpoint_path": "checkpoints/latest.pt"
 }
