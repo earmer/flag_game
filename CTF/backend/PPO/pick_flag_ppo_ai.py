@@ -24,6 +24,13 @@ ACTION_INDEX_TO_MOVE = {
     4: "right",
 }
 
+def select_device():
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
 
 def load_config(path):
     if path.exists():
@@ -41,7 +48,7 @@ class PPOBackend:
         self.vector_dim = config.get("vector_dim", 64)
         t_cfg = config.get("transformer", {})
 
-        self.device = torch.device(os.environ.get("CTF_PPO_DEVICE", "cpu"))
+        self.device = select_device()
         self.encoder = StateEncoder(width=self.width, height=self.height, max_players=self.max_players)
         self.model = PPOTransformerPolicy(
             width=self.width,
@@ -54,6 +61,7 @@ class PPOBackend:
             mlp_dim=t_cfg.get("mlp_dim", 128),
         ).to(self.device)
         self._load_checkpoint(config.get("checkpoint_path", "checkpoints/latest.pt"))
+        print(f"[PPO] inference on device: {self.device}")
         self.model.eval()
 
     def _load_checkpoint(self, rel_path):
