@@ -20,8 +20,8 @@
   "reward": {
     "score": 10.0,
     "flag_pickup": 1,
-    "prison": -0.1,
-    "distance": 0.1,
+    "prison": -0.01,
+    "distance": 0.001,
     "capture": 0.05
   },
   "training": {
