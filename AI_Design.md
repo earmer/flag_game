@@ -19,13 +19,17 @@
 07 Opposite Player 1
 08 Opposite Player 2
 
-09 Prison
-10 Home
-11 Home Already With Flag
-12 Oppo Home
+09 Opposite Player 0 With Flag
+10 Opposite Player 1 With Flag
+11 Opposite Player 2 With Flag
 
-13 Barrier
-14 Blank
+12 Prison
+13 Home
+14 Home Already With Flag
+15 Oppo Home
 
-15 Flag
-16 Oppo Flag
+16 Barrier
+17 Blank
+
+18 Flag
+19 Oppo Flag

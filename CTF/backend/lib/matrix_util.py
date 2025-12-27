@@ -9,14 +9,15 @@ class CTFMatrixConverter:
             "PLAYER": [0, 1, 2],
             "PLAYER_WITH_FLAG": [3, 4, 5],
             "OPPO_PLAYER": [6, 7, 8],
-            "PRISON": 9,
-            "HOME": 10,
-            "HOME_WITH_FLAG": 11,
-            "OPPO_HOME": 12,
-            "BARRIER": 13,
-            "BLANK": 14,
-            "FLAG": 15,
-            "OPPO_FLAG": 16
+            "OPPO_PLAYER_WITH_FLAG": [9, 10, 11],
+            "PRISON": 12,
+            "HOME": 13,
+            "HOME_WITH_FLAG": 14,
+            "OPPO_HOME": 15,
+            "BARRIER": 16,
+            "BLANK": 17,
+            "FLAG": 18,
+            "OPPO_FLAG": 19
         }
         self.static_matrix = None
 
@@ -63,10 +64,11 @@ class CTFMatrixConverter:
             if f["canPickup"]:
                 matrix[f["posY"]][f["posX"]] = self.ID["OPPO_FLAG"]
         
-        # 3. 处理对方球员 (ID 06-08)
+        # 3. 处理对方球员 (ID 06-08 或 09-11)
         for i, p in enumerate(status_req.get("opponentPlayer", [])):
             if i < 3:
-                matrix[p["posY"]][p["posX"]] = self.ID["OPPO_PLAYER"][i]
+                id_list = self.ID["OPPO_PLAYER_WITH_FLAG"] if p["hasFlag"] else self.ID["OPPO_PLAYER"]
+                matrix[p["posY"]][p["posX"]] = id_list[i]
 
         # 4. 处理我方球员 (ID 00-02 或 03-05) - 优先级最高，覆盖在地图最上方
         for i, p in enumerate(status_req.get("myteamPlayer", [])):
