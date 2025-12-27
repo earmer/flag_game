@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "distance_metric": "manhattan",
+  "potential": {
+    "flag": { "weight": -8.0, "decay": 1.2, "max_distance": 30 },
+    "home": { "weight": -10.0, "decay": 1.2, "max_distance": 30 },
+    "enemy": { "weight": 12.0, "decay": 1.0, "max_distance": 8 },
+    "obstacle": { "weight": 10.0, "decay": 1.0, "max_distance": 6 }
+  },
+  "movement": {
+    "allow_stay": true,
+    "random_tie_break": true
+  },
+  "debug": {
+    "log_every_n_ticks": 0
+  }
+}
