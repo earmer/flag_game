@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 
 from lib.game_engine import GameMap, run_game_server
 
@@ -18,6 +19,7 @@ class DefensiveCTFAI:
         self.attack_phase = False
         self.attackers = set()
         self.defender_name = None
+        self.attack_progress = {}
         self.avoid_radius = 1
 
     def start_game(self, req):
@@ -25,6 +27,7 @@ class DefensiveCTFAI:
         self.attack_phase = False
         self.attackers = set()
         self.defender_name = None
+        self.attack_progress = {}
         self._init_geometry()
         side = "Left" if self.my_side_is_left else "Right"
         print(f"Defense AI started. Side: {side}; guard_post={self.guard_post}")
@@ -92,6 +95,13 @@ class DefensiveCTFAI:
             return max(0, min(self.world.height - 1, int(round(target_y))))
         return min(self.boundary_ys, key=lambda y: abs(y - target_y))
 
+    def _spread_boundary_y(self, occupied_ys):
+        if not self.boundary_ys:
+            return self.world.height // 2
+        if not occupied_ys:
+            return self._closest_boundary_y(self.world.height // 2)
+        return max(self.boundary_ys, key=lambda y: min(abs(y - oy) for oy in occupied_ys))
+
     def _expanded_enemy_obstacles(self, opponents, radius):
         if radius <= 0:
             return {self._pos(o) for o in opponents}
@@ -137,22 +147,48 @@ class DefensiveCTFAI:
                 targets[p["name"]] = fallback
             return targets
 
-        defenders_sorted = sorted(defenders, key=lambda p: p["posY"])
+        defenders = list(defenders)
         opponents_sorted = sorted(opponents, key=lambda p: p["posY"])
 
-        for idx, p in enumerate(defenders_sorted):
-            if idx < len(opponents_sorted):
-                opp_y = opponents_sorted[idx]["posY"]
-            else:
-                opp_y = opponents_sorted[-1]["posY"]
-            target_y = self._closest_boundary_y(opp_y)
-            targets[p["name"]] = (self.our_boundary_x, target_y)
+        if len(opponents_sorted) >= len(defenders):
+            defenders_sorted = sorted(defenders, key=lambda p: p["posY"])
+            for p, opp in zip(defenders_sorted, opponents_sorted):
+                target_y = self._closest_boundary_y(opp["posY"])
+                targets[p["name"]] = (self.our_boundary_x, target_y)
+            return targets
+
+        best_total = None
+        best_pairing = None
+        for perm in itertools.permutations(defenders, len(opponents_sorted)):
+            total = sum(
+                abs(perm[idx]["posY"] - opponents_sorted[idx]["posY"])
+                for idx in range(len(opponents_sorted))
+            )
+            if best_total is None or total < best_total:
+                best_total = total
+                best_pairing = list(zip(perm, opponents_sorted))
+
+        assigned_names = set()
+        occupied_ys = []
+        for defender, opp in best_pairing:
+            target_y = self._closest_boundary_y(opp["posY"])
+            targets[defender["name"]] = (self.our_boundary_x, target_y)
+            assigned_names.add(defender["name"])
+            occupied_ys.append(target_y)
+
+        waiting = [p for p in defenders if p["name"] not in assigned_names]
+        for p in waiting:
+            wait_y = self._spread_boundary_y(occupied_ys)
+            targets[p["name"]] = (self.our_boundary_x, wait_y)
+            occupied_ys.append(wait_y)
+
         return targets
 
     def _choose_attack_roles(self, players, opponents):
         if not players:
             self.attackers = set()
             self.defender_name = None
+            self.attack_progress = {}
             return
 
         opponent_positions = [self._pos(o) for o in opponents]
@@ -179,6 +215,22 @@ class DefensiveCTFAI:
         attackers = attackers[:2]
         self.attackers = {p["name"] for p in attackers}
         self.defender_name = defender["name"]
+        self.attack_progress = {
+            name: self.attack_progress.get(name, False) for name in self.attackers
+        }
+
+    def _begin_attack_phase(self, players, opponents):
+        self.attack_phase = True
+        self._choose_attack_roles(players, opponents)
+        self.attack_progress = {name: False for name in self.attackers}
+
+    def _update_attack_progress(self, players_by_name):
+        for name in self.attackers:
+            player = players_by_name.get(name)
+            if not player or player.get("inPrison"):
+                continue
+            if not self._is_safe(self._pos(player)):
+                self.attack_progress[name] = True
 
     def _attackers_done(self, players_by_name):
         if not self.attackers:
@@ -189,17 +241,23 @@ class DefensiveCTFAI:
                 continue
             if player.get("inPrison"):
                 continue
-            pos = self._pos(player)
-            if self._is_safe(pos) and not player.get("hasFlag"):
+            if not self.attack_progress.get(name, False):
+                return False
+            if self._is_safe(self._pos(player)):
                 continue
             return False
         return True
 
-    def _plan_defense(self, my_free, opponents_free):
+    def _plan_defense(self, my_free, opponents_free, targets):
         actions = {}
-        targets = self._assign_defense_targets(my_free, opponents_free)
+        defense_targets = self._assign_defense_targets(my_free, opponents_free)
         for p in my_free:
-            dest = targets.get(p["name"])
+            if p.get("hasFlag"):
+                move = self._plan_attacker(p, opponents_free, [], targets)
+                if move:
+                    actions[p["name"]] = move
+                continue
+            dest = defense_targets.get(p["name"])
             if not dest:
                 continue
             start = self._pos(p)
@@ -268,7 +326,10 @@ class DefensiveCTFAI:
                 defender = min(candidates, key=lambda p: self._manhattan(self._pos(p), guard))
 
         if defender:
-            move = self._plan_defender(defender, opponents_free)
+            if defender.get("hasFlag"):
+                move = self._plan_attacker(defender, opponents_free, enemy_flags, targets)
+            else:
+                move = self._plan_defender(defender, opponents_free)
             if move:
                 actions[defender["name"]] = move
 
@@ -307,20 +368,22 @@ class DefensiveCTFAI:
         targets = set(self.world.list_targets(mine=True) or [])
 
         if not self.attack_phase and len(opponents_prison) >= 2:
-            self.attack_phase = True
-            self._choose_attack_roles(my_free, opponents_free)
+            if len(my_free) >= 3:
+                self._begin_attack_phase(my_free, opponents_free)
 
         if self.attack_phase:
             players_by_name = {p["name"]: p for p in my_all}
+            self._update_attack_progress(players_by_name)
             if self._attackers_done(players_by_name):
                 self.attack_phase = False
                 self.attackers = set()
                 self.defender_name = None
+                self.attack_progress = {}
             elif not self.attackers and my_free:
                 self._choose_attack_roles(my_free, opponents_free)
 
         if not self.attack_phase:
-            return self._plan_defense(my_free, opponents_free)
+            return self._plan_defense(my_free, opponents_free, targets)
         return self._plan_attack(my_all, my_free, opponents_free, enemy_flags, targets)
 
 
