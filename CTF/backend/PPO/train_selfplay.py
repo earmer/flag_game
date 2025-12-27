@@ -27,6 +27,13 @@ def load_config(path):
             return json.load(handle)
     return {}
 
+def select_device():
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
 def render_progress(step, total, prefix="rollout"):
     bar_len = 28
     filled = int(bar_len * step / total)
@@ -39,6 +46,12 @@ def build_movable_mask(player_features, max_players):
     valid = my_features[:, :, PLAYER_FEATURE_INDEX["valid"]]
     in_prison = my_features[:, :, PLAYER_FEATURE_INDEX["in_prison"]]
     return (valid == 1) & (in_prison == 0)
+
+def compute_theta(update_idx, start, end, decay_updates):
+    if decay_updates <= 0:
+        return end
+    progress = min(update_idx / float(decay_updates), 1.0)
+    return start + (end - start) * progress
 
 
 def compute_gae(rewards, values, dones, gamma, gae_lambda):
@@ -172,6 +185,22 @@ def select_actions(model, grid_ids, player_features, device, max_players):
     logprob = (dist.log_prob(actions) * mask).sum(dim=1)
     return actions.squeeze(0).cpu().numpy(), logprob.item(), values.squeeze(0).item()
 
+def select_actions_with_theta(model, grid_ids, player_features, device, max_players, theta, rng):
+    grid_tensor = torch.from_numpy(grid_ids).unsqueeze(0).to(device)
+    player_tensor = torch.from_numpy(player_features).unsqueeze(0).to(device)
+    with torch.no_grad():
+        logits, values = model(grid_tensor, player_tensor)
+
+    mask = build_movable_mask(player_tensor, max_players).float()
+    dist = Categorical(logits=logits)
+    if rng.random() < theta:
+        actions = torch.randint(0, 5, dist.logits.shape[:-1], device=device)
+    else:
+        actions = dist.sample()
+    actions = torch.where(mask.bool(), actions, torch.zeros_like(actions))
+    logprob = (dist.log_prob(actions) * mask).sum(dim=1)
+    return actions.squeeze(0).cpu().numpy(), logprob.item(), values.squeeze(0).item()
+
 def select_actions_greedy(model, grid_ids, player_features, device, max_players):
     grid_tensor = torch.from_numpy(grid_ids).unsqueeze(0).to(device)
     player_tensor = torch.from_numpy(player_features).unsqueeze(0).to(device)
@@ -209,10 +238,12 @@ def moves_to_actions(move_dict, players):
         actions.append(action_map.get(move, 0))
     return actions
 
-def evaluate_against_pick_flag(model, env_cfg, device, episodes, max_players):
+def evaluate_against_pick_flag(model, env_cfg, device, episodes, max_players, eval_theta):
     eval_env = CTFFrontendRulesEnv(env_cfg)
     encoder_L = StateEncoder(width=eval_env.width, height=eval_env.height, max_players=max_players)
     encoder_L.start_game(eval_env.init_req["L"])
+
+    rng = np.random.default_rng()
 
     wins = 0.0
     model.eval()
@@ -226,7 +257,9 @@ def evaluate_against_pick_flag(model, env_cfg, device, episodes, max_players):
                 grid_L, players_L = encoder_L.encode(obs_L)
                 if grid_L is None:
                     break
-                actions_L = select_actions_greedy(model, grid_L, players_L, device, max_players)
+                actions_L, _, _ = select_actions_with_theta(
+                    model, grid_L, players_L, device, max_players, eval_theta, rng
+                )
                 moves_R = pick_flag_ai.plan_next_actions(obs_R) or {}
                 players_R = sorted(obs_R.get("myteamPlayer", []), key=lambda p: p.get("name", ""))
                 actions_R = moves_to_actions(moves_R, players_R)
@@ -249,7 +282,7 @@ def main():
     transformer_cfg = config.get("transformer", {})
     reward_cfg = config.get("reward", {})
 
-    device = torch.device(os.environ.get("CTF_PPO_DEVICE", "cpu"))
+    device = select_device()
     env = CTFFrontendRulesEnv(env_cfg)
 
     encoder_L = StateEncoder(width=env.width, height=env.height, max_players=env.num_players)
@@ -269,6 +302,8 @@ def main():
     ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=ppo_cfg.get("learning_rate", 3e-4))
 
+    print(f"[PPO] training on device: {device}")
+
     load_checkpoint(model, device, config.get("checkpoint_path", "checkpoints/latest.pt"))
 
     rollout_steps = ppo_cfg.get("rollout_steps", 256)
@@ -281,6 +316,10 @@ def main():
     entropy_coef = ppo_cfg.get("entropy_coef", 0.01)
     save_every = config.get("training", {}).get("save_every_updates", 5)
     eval_episodes = config.get("training", {}).get("eval_episodes", 5)
+    theta_start = config.get("training", {}).get("theta_start", 0.2)
+    theta_end = config.get("training", {}).get("theta_end", 0.02)
+    theta_decay_updates = config.get("training", {}).get("theta_decay_updates", 200)
+    eval_theta = config.get("training", {}).get("eval_theta", 0.05)
 
     reward_weights = {
         "score": reward_cfg.get("score", 1.0),
@@ -293,8 +332,10 @@ def main():
     update_idx = 0
     obs_L, obs_R = env.reset()
     buffer = RolloutBuffer()
+    rng = np.random.default_rng(env_cfg.get("seed", 0))
 
     while True:
+        theta = compute_theta(update_idx, theta_start, theta_end, theta_decay_updates)
         buffer.reset()
         for step_idx in range(rollout_steps):
             grid_L, players_L = encoder_L.encode(obs_L)
@@ -302,11 +343,11 @@ def main():
             if grid_L is None or grid_R is None:
                 break
 
-            actions_L, logprob_L, value_L = select_actions(
-                model, grid_L, players_L, device, env.num_players
+            actions_L, logprob_L, value_L = select_actions_with_theta(
+                model, grid_L, players_L, device, env.num_players, theta, rng
             )
-            actions_R, logprob_R, value_R = select_actions(
-                model, grid_R, players_R, device, env.num_players
+            actions_R, logprob_R, value_R = select_actions_with_theta(
+                model, grid_R, players_R, device, env.num_players, theta, rng
             )
             next_obs_L, next_obs_R, done = env.step(actions_L, actions_R)
 
@@ -369,7 +410,7 @@ def main():
             torch.save({"model": model.state_dict()}, ckpt_path)
             print(f"[PPO] saved checkpoint to {ckpt_path}")
             win_rate = evaluate_against_pick_flag(
-                model, env_cfg, device, eval_episodes, env.num_players
+                model, env_cfg, device, eval_episodes, env.num_players, eval_theta
             )
             print(f"[PPO] eval vs pick_flag_ai win_rate={win_rate:.2%} over {eval_episodes} eps")
 
