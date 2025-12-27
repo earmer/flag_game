@@ -337,6 +337,8 @@ def main():
     while True:
         theta = compute_theta(update_idx, theta_start, theta_end, theta_decay_updates)
         buffer.reset()
+        update_reward_L = 0.0
+        update_reward_R = 0.0
         for step_idx in range(rollout_steps):
             grid_L, players_L = encoder_L.encode(obs_L)
             grid_R, players_R = encoder_R.encode(obs_R)
@@ -353,6 +355,8 @@ def main():
 
             reward_L = compute_reward(obs_L, next_obs_L, reward_weights, env.targets["L"])
             reward_R = compute_reward(obs_R, next_obs_R, reward_weights, env.targets["R"])
+            update_reward_L += reward_L
+            update_reward_R += reward_R
 
             buffer.add(grid_L, players_L, actions_L, logprob_L, value_L, reward_L, done)
             buffer.add(grid_R, players_R, actions_R, logprob_R, value_R, reward_R, done)
@@ -404,6 +408,10 @@ def main():
                 optimizer.step()
 
         update_idx += 1
+        print(
+            f"[PPO] update {update_idx} net reward "
+            f"L={update_reward_L:.3f} R={update_reward_R:.3f}"
+        )
         if save_every and update_idx % save_every == 0:
             ckpt_path = Path(__file__).resolve().parent / config.get("checkpoint_path", "checkpoints/latest.pt")
             ckpt_path.parent.mkdir(parents=True, exist_ok=True)
