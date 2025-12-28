@@ -12,15 +12,19 @@ class DefensiveCTFAI:
         self.right_min_x = 0
         self.our_boundary_x = 0
         self.enemy_boundary_x = 0
+        self.defense_line_x = 0
         self.safe_cells = set()
         self.enemy_cells = set()
         self.boundary_ys = []
+        self.defense_ys = []
+        self.safe_entry_cells = []
         self.guard_post = None
         self.attack_phase = False
         self.attackers = set()
         self.defender_name = None
         self.attack_progress = {}
         self.avoid_radius = 1
+        self.avoid_radius_return = 2
 
     def start_game(self, req):
         self.world.init(req)
@@ -51,9 +55,16 @@ class DefensiveCTFAI:
         if self.my_side_is_left:
             self.our_boundary_x = self.left_max_x
             self.enemy_boundary_x = self.right_min_x
+            inner_x = self.our_boundary_x - 1
         else:
             self.our_boundary_x = self.right_min_x
             self.enemy_boundary_x = self.left_max_x
+            inner_x = self.our_boundary_x + 1
+
+        if 0 <= inner_x < width and self._is_safe((inner_x, 0)):
+            self.defense_line_x = inner_x
+        else:
+            self.defense_line_x = self.our_boundary_x
 
         self.safe_cells = set()
         self.enemy_cells = set()
@@ -70,6 +81,14 @@ class DefensiveCTFAI:
             for y in range(height)
             if (self.our_boundary_x, y) not in self.world.walls
         ]
+        self.defense_ys = [
+            y
+            for y in range(height)
+            if (self.defense_line_x, y) not in self.world.walls
+        ]
+        line_ys = self.defense_ys or self.boundary_ys
+        line_x = self.defense_line_x if self.defense_ys else self.our_boundary_x
+        self.safe_entry_cells = [(line_x, y) for y in line_ys]
         self.guard_post = self._choose_guard_post()
 
     def _is_safe(self, pos):
@@ -84,23 +103,31 @@ class DefensiveCTFAI:
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
     def _choose_guard_post(self):
-        if not self.boundary_ys:
+        line_ys = self.defense_ys or self.boundary_ys
+        line_x = self.defense_line_x if self.defense_ys else self.our_boundary_x
+        if not line_ys:
             return next(iter(self.safe_cells), (0, 0))
         center_y = self.world.height // 2
-        best_y = min(self.boundary_ys, key=lambda y: abs(y - center_y))
-        return (self.our_boundary_x, best_y)
+        best_y = min(line_ys, key=lambda y: abs(y - center_y))
+        return (line_x, best_y)
 
     def _closest_boundary_y(self, target_y):
-        if not self.boundary_ys:
-            return max(0, min(self.world.height - 1, int(round(target_y))))
-        return min(self.boundary_ys, key=lambda y: abs(y - target_y))
+        return self._closest_line_y(target_y, self.boundary_ys)
 
-    def _spread_boundary_y(self, occupied_ys):
-        if not self.boundary_ys:
-            return self.world.height // 2
+    def _closest_defense_y(self, target_y):
+        return self._closest_line_y(target_y, self.defense_ys or self.boundary_ys)
+
+    def _closest_line_y(self, target_y, candidates):
+        if not candidates:
+            return max(0, min(self.world.height - 1, int(round(target_y))))
+        return min(candidates, key=lambda y: abs(y - target_y))
+
+    def _spread_line_y(self, occupied_ys, candidates):
+        if not candidates:
+            candidates = [self._closest_boundary_y(self.world.height // 2)]
         if not occupied_ys:
-            return self._closest_boundary_y(self.world.height // 2)
-        return max(self.boundary_ys, key=lambda y: min(abs(y - oy) for oy in occupied_ys))
+            return self._closest_line_y(self.world.height // 2, candidates)
+        return max(candidates, key=lambda y: min(abs(y - oy) for oy in occupied_ys))
 
     def _expanded_enemy_obstacles(self, opponents, radius):
         if radius <= 0:
@@ -136,50 +163,117 @@ class DefensiveCTFAI:
             return None
         return GameMap.get_direction(start, path[1])
 
+    def _target_cell_for_opponent(self, opponent):
+        opp_pos = self._pos(opponent)
+        if self._is_safe(opp_pos):
+            line_x = self.our_boundary_x
+            line_ys = self.boundary_ys
+            target_y = self._closest_line_y(opp_pos[1], line_ys)
+        else:
+            if opp_pos[0] == self.enemy_boundary_x:
+                line_x = self.our_boundary_x
+                line_ys = self.boundary_ys
+            else:
+                line_x = self.defense_line_x if self.defense_ys else self.our_boundary_x
+                line_ys = self.defense_ys or self.boundary_ys
+            target_y = self._closest_line_y(opp_pos[1], line_ys)
+        return line_x, target_y
+
     def _assign_defense_targets(self, defenders, opponents):
         targets = {}
         if not defenders:
             return targets
 
         if not opponents:
-            fallback = self.guard_post or (self.our_boundary_x, self.world.height // 2)
+            fallback_x = self.defense_line_x if self.defense_ys else self.our_boundary_x
+            fallback_y = self._closest_line_y(self.world.height // 2, self.defense_ys or self.boundary_ys)
+            fallback = (fallback_x, fallback_y)
             for p in defenders:
                 targets[p["name"]] = fallback
             return targets
 
         defenders = list(defenders)
-        opponents_sorted = sorted(opponents, key=lambda p: p["posY"])
+        opponent_targets = []
+        intruders = []
+        border_threats = []
+        outsiders = []
+        for opp in opponents:
+            opp_pos = self._pos(opp)
+            line_x, target_y = self._target_cell_for_opponent(opp)
+            entry = (opp, line_x, target_y)
+            opponent_targets.append(entry)
+            if self._is_safe(opp_pos):
+                intruders.append(entry)
+            elif opp_pos[0] == self.enemy_boundary_x:
+                border_threats.append(entry)
+            else:
+                outsiders.append(entry)
 
-        if len(opponents_sorted) >= len(defenders):
-            defenders_sorted = sorted(defenders, key=lambda p: p["posY"])
-            for p, opp in zip(defenders_sorted, opponents_sorted):
-                target_y = self._closest_boundary_y(opp["posY"])
-                targets[p["name"]] = (self.our_boundary_x, target_y)
-            return targets
-
-        best_total = None
-        best_pairing = None
-        for perm in itertools.permutations(defenders, len(opponents_sorted)):
-            total = sum(
-                abs(perm[idx]["posY"] - opponents_sorted[idx]["posY"])
-                for idx in range(len(opponents_sorted))
-            )
-            if best_total is None or total < best_total:
-                best_total = total
-                best_pairing = list(zip(perm, opponents_sorted))
+        def cost_for(defender, opp_entry):
+            _, tx, ty = opp_entry
+            return self._manhattan(self._pos(defender), (tx, ty))
 
         assigned_names = set()
         occupied_ys = []
-        for defender, opp in best_pairing:
-            target_y = self._closest_boundary_y(opp["posY"])
-            targets[defender["name"]] = (self.our_boundary_x, target_y)
+
+        if len(defenders) <= len(opponent_targets):
+            priority_targets = intruders + border_threats
+            non_priority = [entry for entry in outsiders if entry not in border_threats]
+            if priority_targets and len(priority_targets) >= len(defenders):
+                candidate_pool = priority_targets
+                required_targets = []
+                remaining_slots = len(defenders)
+            else:
+                required_targets = priority_targets
+                remaining_slots = len(defenders) - len(required_targets)
+                candidate_pool = non_priority
+
+            best_total = None
+            best_perm = None
+            if remaining_slots <= 0:
+                fixed_targets = required_targets[: len(defenders)]
+                for perm in itertools.permutations(fixed_targets, len(defenders)):
+                    total = sum(cost_for(defenders[idx], perm[idx]) for idx in range(len(defenders)))
+                    if best_total is None or total < best_total:
+                        best_total = total
+                        best_perm = perm
+            else:
+                for subset in itertools.combinations(candidate_pool, remaining_slots):
+                    combined = list(required_targets) + list(subset)
+                    for perm in itertools.permutations(combined, len(defenders)):
+                        total = sum(cost_for(defenders[idx], perm[idx]) for idx in range(len(defenders)))
+                        if best_total is None or total < best_total:
+                            best_total = total
+                            best_perm = perm
+
+            for idx, defender in enumerate(defenders):
+                _, tx, ty = best_perm[idx]
+                targets[defender["name"]] = (tx, ty)
+                assigned_names.add(defender["name"])
+                occupied_ys.append(ty)
+            return targets
+
+        best_total = None
+        best_perm = None
+        for perm in itertools.permutations(defenders, len(opponent_targets)):
+            total = sum(cost_for(perm[idx], opponent_targets[idx]) for idx in range(len(opponent_targets)))
+            if best_total is None or total < best_total:
+                best_total = total
+                best_perm = perm
+
+        for idx, opp_entry in enumerate(opponent_targets):
+            defender = best_perm[idx]
+            _, tx, ty = opp_entry
+            targets[defender["name"]] = (tx, ty)
             assigned_names.add(defender["name"])
-            occupied_ys.append(target_y)
+            occupied_ys.append(ty)
 
         waiting = [p for p in defenders if p["name"] not in assigned_names]
+        line_x = self.defense_line_x if self.defense_ys else self.our_boundary_x
+        line_ys = self.defense_ys or self.boundary_ys
         for p in waiting:
-            wait_y = self._spread_boundary_y(occupied_ys)
-            targets[p["name"]] = (self.our_boundary_x, wait_y)
+            wait_y = self._spread_line_y(occupied_ys, line_ys)
+            targets[p["name"]] = (line_x, wait_y)
             occupied_ys.append(wait_y)
 
         return targets
@@ -206,7 +300,7 @@ class DefensiveCTFAI:
             else:
                 attackers = []
         else:
-            guard = self.guard_post or (self.our_boundary_x, self.world.height // 2)
+            guard = self.guard_post or (self.defense_line_x, self.world.height // 2)
             distances = [(self._manhattan(self._pos(p), guard), p) for p in players]
             distances.sort(key=lambda item: item[0])
             defender = distances[0][1]
@@ -273,11 +367,26 @@ class DefensiveCTFAI:
         if defender is None:
             return None
         if opponents_free:
-            opp_pos = min(opponents_free, key=lambda o: abs(o["posY"] - defender["posY"]))
-            target_y = self._closest_boundary_y(opp_pos["posY"])
-            dest = (self.our_boundary_x, target_y)
+            intruders = [o for o in opponents_free if self._is_safe(self._pos(o))]
+            border_threats = [
+                o for o in opponents_free
+                if (not self._is_safe(self._pos(o))) and self._pos(o)[0] == self.enemy_boundary_x
+            ]
+            if intruders:
+                opp = min(intruders, key=lambda o: self._manhattan(self._pos(defender), self._pos(o)))
+                target_y = self._closest_boundary_y(opp["posY"])
+                dest = (self.our_boundary_x, target_y)
+            elif border_threats:
+                opp = min(border_threats, key=lambda o: abs(o["posY"] - defender["posY"]))
+                target_y = self._closest_boundary_y(opp["posY"])
+                dest = (self.our_boundary_x, target_y)
+            else:
+                opp = min(opponents_free, key=lambda o: abs(o["posY"] - defender["posY"]))
+                target_y = self._closest_defense_y(opp["posY"])
+                line_x = self.defense_line_x if self.defense_ys else self.our_boundary_x
+                dest = (line_x, target_y)
         else:
-            dest = self.guard_post or (self.our_boundary_x, self.world.height // 2)
+            dest = self.guard_post or (self.defense_line_x, self.world.height // 2)
 
         start = self._pos(defender)
         path = self._route(start, dest, restrict_safe=True)
@@ -287,13 +396,23 @@ class DefensiveCTFAI:
 
     def _plan_attacker(self, player, opponents_free, enemy_flags, targets):
         start = self._pos(player)
-        avoid1 = self._expanded_enemy_obstacles(opponents_free, self.avoid_radius)
+        avoid_radius = self.avoid_radius_return if player.get("hasFlag") else self.avoid_radius
+        avoid2 = self._expanded_enemy_obstacles(opponents_free, avoid_radius)
+        avoid1 = self._expanded_enemy_obstacles(opponents_free, 1)
         avoid0 = self._expanded_enemy_obstacles(opponents_free, 0)
 
         if player.get("hasFlag"):
+            if not self._is_safe(start):
+                entry_cells = self.safe_entry_cells or [(self.our_boundary_x, y) for y in self.boundary_ys]
+                for avoid in (avoid2, avoid1, avoid0, None):
+                    path = self._route_any(start, entry_cells, extra_obstacles=avoid, restrict_safe=False)
+                    move = self._next_move(start, path)
+                    if move:
+                        return move
+
             goal_positions = list(targets)
-            for avoid in (avoid1, avoid0, None):
-                path = self._route_any(start, goal_positions, extra_obstacles=avoid, restrict_safe=False)
+            for avoid in (avoid2, avoid1, avoid0, None):
+                path = self._route_any(start, goal_positions, extra_obstacles=avoid, restrict_safe=True)
                 move = self._next_move(start, path)
                 if move:
                     return move
@@ -322,7 +441,7 @@ class DefensiveCTFAI:
         if defender is None:
             candidates = [p for p in my_free if p["name"] not in self.attackers]
             if candidates:
-                guard = self.guard_post or (self.our_boundary_x, self.world.height // 2)
+                guard = self.guard_post or (self.defense_line_x, self.world.height // 2)
                 defender = min(candidates, key=lambda p: self._manhattan(self._pos(p), guard))
 
         if defender:
@@ -346,7 +465,7 @@ class DefensiveCTFAI:
             if p["name"] not in self.attackers and (not defender or p["name"] != defender["name"])
         ]
         if extra_free:
-            fallback = self.guard_post or (self.our_boundary_x, self.world.height // 2)
+            fallback = self.guard_post or (self.defense_line_x, self.world.height // 2)
             for p in extra_free:
                 start = self._pos(p)
                 path = self._route(start, fallback, restrict_safe=True)

@@ -25,6 +25,8 @@ class AggressiveCTFAI:
         self.tick = 0
         self.num_flags = 0
         self.stall_score_threshold = 0
+        self.staging_ticks = 0
+        self.max_staging_ticks = 50
 
         self.flag_switch_penalty = 3.0
         self.lane_switch_penalty = 1.5
@@ -46,6 +48,7 @@ class AggressiveCTFAI:
         self.lane_ys = []
         self.num_flags = req.get("numFlags", 0)
         self.stall_score_threshold = max(0, self.num_flags - 2)
+        self.staging_ticks = 0
         self._init_geometry()
         side = "Left" if self.my_side_is_left else "Right"
         print(f"Aggressive AI started. Side: {side}")
@@ -431,8 +434,11 @@ class AggressiveCTFAI:
             and abs(self._pos(o)[0] - self.our_boundary_x) <= self.boundary_alert_distance
         ]
 
-        all_ready = not prisoners and not waiting and not intruders
-        if all_ready:
+        all_ready = not prisoners and not waiting
+        allow_attack = all_ready
+        if allow_attack and intruder_carriers and self.staging_ticks < self.max_staging_ticks:
+            allow_attack = False
+        if allow_attack:
             return actions, True
 
         for p in waiting:
@@ -637,9 +643,11 @@ class AggressiveCTFAI:
         if self.phase != "rescue" and self._should_rescue(my_prisoners, my_free):
             self.phase = "rescue"
             self.attack_stage = "staging"
+            self.staging_ticks = 0
         elif self.phase == "rescue" and not my_prisoners:
             self.phase = "attack"
             self.attack_stage = "staging"
+            self.staging_ticks = 0
 
         if self.phase == "rescue":
             return self._rescue_moves(my_free, prisons, opponents_free)
@@ -653,12 +661,15 @@ class AggressiveCTFAI:
         if not carriers and all_safe_no_flag and self.attack_stage == "go":
             self.attack_stage = "staging"
             self.flag_assignment = {}
+            self.staging_ticks = 0
 
         if not carriers and self.attack_stage == "staging":
+            self.staging_ticks += 1
             actions, all_ready = self._staging_actions(my_free, opponents_free, my_prisoners)
             if not all_ready:
                 return actions
             self.attack_stage = "go"
+            self.staging_ticks = 0
 
         self._assign_lanes_to_players(my_free)
 

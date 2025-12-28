@@ -24,6 +24,9 @@ class ExtremeCTFAI:
     DANGER_PENALTY = 60.0
     AVOID_PENALTY = 8.0
     INTERCEPT_RADIUS = 4
+    SAFE_PUSH_WEIGHT = 4.0
+    RETREAT_PENALTY = 8.0
+    LANE_RELAX_FACTOR = 0.25
 
     def __init__(self, show_gap_in_msec=1000.0):
         self.world = GameMap(show_gap_in_msec=show_gap_in_msec)
@@ -154,6 +157,16 @@ class ExtremeCTFAI:
             return self._manhattan(start, goal)
         return len(path) - 1
 
+    def _path_direction(self, start, target, avoid=None):
+        if not target:
+            return None
+        path = self.world.route_to(start, target, extra_obstacles=avoid)
+        if not path and avoid:
+            path = self.world.route_to(start, target, extra_obstacles=None)
+        if path and len(path) > 1:
+            return GameMap.get_direction(start, path[1])
+        return None
+
     def _closest_by_path(self, start, goals, avoid=None):
         best_goal = None
         best_dist = None
@@ -203,9 +216,16 @@ class ExtremeCTFAI:
     def _choose_move(self, start, target, role, lane_y, enemy_positions, avoid, is_carrier):
         if not target:
             return None
+        avoid = set(avoid or [])
         dist_before = self._route_length(start, target, avoid)
+        path_dir = self._path_direction(start, target, avoid)
+        start_is_safe = self._is_safe(start)
+        target_is_enemy = target is not None and not self._is_safe(target)
+        threat_distance = self._min_enemy_distance(start, enemy_positions)
+        threatened = (not start_is_safe) and threat_distance <= (self.DANGER_DISTANCE + 1)
         best_score = None
         best_move = None
+        best_progress = None
 
         for direction, dx, dy in self.MOVES:
             nx, ny = start[0] + dx, start[1] + dy
@@ -221,22 +241,33 @@ class ExtremeCTFAI:
             lane_score = -abs(ny - lane_y) if lane_y is not None else 0.0
 
             weights = self.CARRIER_WEIGHTS if is_carrier else self.ROLE_WEIGHTS.get(role, self.ROLE_WEIGHTS["sprinter"])
+            lane_weight = weights["lane"]
+            if role == "flanker" and progress > 0:
+                lane_weight *= self.LANE_RELAX_FACTOR
             score = (
                 weights["progress"] * progress
                 + weights["safety"] * safety
-                + weights["lane"] * lane_score
+                + lane_weight * lane_score
             )
 
             if not self._is_safe(next_pos) and safety <= self.DANGER_DISTANCE:
                 score -= self.DANGER_PENALTY
             if next_pos in avoid:
                 score -= self.AVOID_PENALTY
+            if (not is_carrier) and target_is_enemy and start_is_safe:
+                if progress < 0:
+                    score -= self.RETREAT_PENALTY * abs(progress)
+                else:
+                    score += self.SAFE_PUSH_WEIGHT * progress
 
             if best_score is None or score > best_score:
                 best_score = score
                 best_move = direction
+                best_progress = progress
 
-        return best_move
+        if best_move and best_progress is not None and best_progress <= 0 and path_dir and not threatened:
+            return path_dir
+        return best_move or path_dir
 
     def plan_next_actions(self, req):
         if not self.world.update(req):
