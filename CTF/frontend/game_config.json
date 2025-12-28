@@ -12,7 +12,7 @@
   "setup": {
     "numPlayers": 3,
     "numFlags": 9,
-    "useRandomFlags": false
+    "useRandomFlags": true
   },
   "servers": {
     "user1-11": "ws://localhost:8080",
