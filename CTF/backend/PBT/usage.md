@@ -13,3 +13,35 @@
   - cd CTF/backend/PBT && python -c "import torch; from ppo_model import PPOModel; m=PPOModel();
     print(m(torch.zeros(1,20,20,dtype=torch.long))[0].shape)"
   - cd CTF/backend/PBT && python train_ppo.py
+
+
+## Terminal mock-env 外层套件（用于逻辑一致性验证）
+
+`terminal_suite.py` 会直接驱动 `mock_env_vnew.py` 的 `init/status/finished` 循环，并在终端渲染网格（墙/障碍/目标区/监狱/玩家/旗帜），方便和 `CTF/frontend` 的表现做对照。
+
+### 运行
+
+- L0 键盘控制 + R 随机对手：
+  - `cd CTF/backend/PBT && python3 terminal_suite.py --l keyboard --r random`
+- 自动播放（每回合延迟 120ms）：
+  - `cd CTF/backend/PBT && python3 terminal_suite.py --delay-ms 120`
+
+快捷键：`space` 暂停/继续，`n` 单步，`q` 退出；键盘控制时 `WASD -> L0`，`IJKL -> R0`。
+
+### 接入现有 AI（无 WebSocket，本地直调用）
+
+如果你的 AI 脚本暴露了与 WebSocket backend 一致的函数：
+
+- `start_game(req)`
+- `plan_next_actions(req)`（返回 `{player_name: direction}` 或 `{"players": {...}}`）
+- 可选：`game_over(req)`
+
+那么可以用 `module:` 直接接入，例如：
+
+- `cd CTF/backend/PBT && python3 terminal_suite.py --l module:pick_flag_ai --r module:pick_closest_flag`
+
+### 接入任意程序（子进程 JSONL 协议）
+
+也可以把控制器作为子进程启动：父进程按行发送 JSON（`init/status/finished`），子进程按行返回 JSON（`{"players": {...}}` 或直接 `{...}`）。
+
+- `cd CTF/backend/PBT && python3 terminal_suite.py --l 'cmd:["python3","my_bot.py"]' --r random`
