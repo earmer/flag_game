@@ -163,18 +163,6 @@ class DefensiveCTFAI:
             return None
         return GameMap.get_direction(start, path[1])
 
-    def _escape_to_safe(self, start, opponents_free):
-        entry_cells = self.safe_entry_cells or [(self.our_boundary_x, y) for y in self.boundary_ys]
-        avoid2 = self._expanded_enemy_obstacles(opponents_free, self.avoid_radius_return)
-        avoid1 = self._expanded_enemy_obstacles(opponents_free, 1)
-        avoid0 = self._expanded_enemy_obstacles(opponents_free, 0)
-        for avoid in (avoid2, avoid1, avoid0, None):
-            path = self._route_any(start, entry_cells, extra_obstacles=avoid, restrict_safe=False)
-            move = self._next_move(start, path)
-            if move:
-                return move
-        return None
-
     def _target_cell_for_opponent(self, opponent):
         opp_pos = self._pos(opponent)
         if self._is_safe(opp_pos):
@@ -390,15 +378,10 @@ class DefensiveCTFAI:
                 if move:
                     actions[p["name"]] = move
                 continue
-            start = self._pos(p)
-            if not self._is_safe(start):
-                move = self._escape_to_safe(start, opponents_free)
-                if move:
-                    actions[p["name"]] = move
-                continue
             dest = defense_targets.get(p["name"])
             if not dest:
                 continue
+            start = self._pos(p)
             path = self._route(start, dest, restrict_safe=True)
             if not path and self.guard_post:
                 path = self._route(start, self.guard_post, restrict_safe=True)
@@ -410,9 +393,6 @@ class DefensiveCTFAI:
     def _plan_defender(self, defender, opponents_free):
         if defender is None:
             return None
-        start = self._pos(defender)
-        if not self._is_safe(start):
-            return self._escape_to_safe(start, opponents_free)
         if opponents_free:
             intruders = [o for o in opponents_free if self._is_safe(self._pos(o))]
             border_threats = [
@@ -435,6 +415,7 @@ class DefensiveCTFAI:
         else:
             dest = self.guard_post or (self.defense_line_x, self.world.height // 2)
 
+        start = self._pos(defender)
         path = self._route(start, dest, restrict_safe=True)
         if not path and self.guard_post:
             path = self._route(start, self.guard_post, restrict_safe=True)
