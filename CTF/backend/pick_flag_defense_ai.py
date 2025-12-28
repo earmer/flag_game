@@ -342,37 +342,10 @@ class DefensiveCTFAI:
             return False
         return True
 
-    def _plan_defense(self, my_free, opponents_free, targets, my_prisoners, prisons):
+    def _plan_defense(self, my_free, opponents_free, targets):
         actions = {}
-        intruders = [o for o in opponents_free if self._is_safe(self._pos(o))]
-        border_threats = [
-            o for o in opponents_free
-            if (not self._is_safe(self._pos(o))) and self._pos(o)[0] == self.enemy_boundary_x
-        ]
-        low_pressure = not intruders and not border_threats
-
-        rescuer_name = None
-        if low_pressure and my_prisoners and prisons:
-            rescue_candidates = [
-                p for p in my_free
-                if self._is_safe(self._pos(p)) and not p.get("hasFlag")
-            ]
-            best_path = None
-            best_player = None
-            for p in rescue_candidates:
-                path = self._route_any(self._pos(p), prisons, restrict_safe=True)
-                if path and (best_path is None or len(path) < len(best_path)):
-                    best_path = path
-                    best_player = p
-            if best_player:
-                rescuer_name = best_player["name"]
-                move = self._next_move(self._pos(best_player), best_path)
-                if move:
-                    actions[rescuer_name] = move
-
-        defenders = [p for p in my_free if p["name"] != rescuer_name]
-        defense_targets = self._assign_defense_targets(defenders, opponents_free)
-        for p in defenders:
+        defense_targets = self._assign_defense_targets(my_free, opponents_free)
+        for p in my_free:
             if p.get("hasFlag"):
                 move = self._plan_attacker(p, opponents_free, [], targets)
                 if move:
@@ -508,12 +481,10 @@ class DefensiveCTFAI:
 
         my_all = self.world.list_players(mine=True, inPrison=None, hasFlag=None) or []
         my_free = [p for p in my_all if not p.get("inPrison")]
-        my_prisoners = self.world.list_players(mine=True, inPrison=True, hasFlag=None) or []
         opponents_free = self.world.list_players(mine=False, inPrison=False, hasFlag=None) or []
         opponents_prison = self.world.list_players(mine=False, inPrison=True, hasFlag=None) or []
         enemy_flags = self.world.list_flags(mine=False, canPickup=True) or []
         targets = set(self.world.list_targets(mine=True) or [])
-        prisons = list(self.world.list_prisons(mine=True) or [])
 
         if not self.attack_phase and len(opponents_prison) >= 2:
             if len(my_free) >= 3:
@@ -531,7 +502,7 @@ class DefensiveCTFAI:
                 self._choose_attack_roles(my_free, opponents_free)
 
         if not self.attack_phase:
-            return self._plan_defense(my_free, opponents_free, targets, my_prisoners, prisons)
+            return self._plan_defense(my_free, opponents_free, targets)
         return self._plan_attack(my_all, my_free, opponents_free, enemy_flags, targets)
 
 
