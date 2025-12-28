@@ -1,0 +1,337 @@
+{
+  "feature_names": [
+    "blocked_down",
+    "blocked_left",
+    "blocked_right",
+    "blocked_up",
+    "dist_enemy_flag",
+    "dist_home_prison",
+    "dist_home_target",
+    "dist_nearest_opp",
+    "dist_nearest_opp_carrier",
+    "has_flag",
+    "in_prison",
+    "is_safe",
+    "num_intruders_with_flag",
+    "num_my_prisoners",
+    "num_opp_prisoners",
+    "x",
+    "y"
+  ],
+  "labels": [
+    "",
+    "up",
+    "down",
+    "left",
+    "right"
+  ],
+  "max_depth": 10,
+  "min_samples_leaf": 10,
+  "min_samples_split": 30,
+  "root": {
+    "feature": "in_prison",
+    "left": {
+      "feature": "has_flag",
+      "left": {
+        "feature": "dist_home_prison",
+        "left": {
+          "feature": "dist_home_prison",
+          "left": {
+            "counts": {
+              "up": 42
+            },
+            "type": "leaf"
+          },
+          "right": {
+            "counts": {
+              "right": 6,
+              "up": 12
+            },
+            "type": "leaf"
+          },
+          "threshold": 4.5,
+          "type": "node"
+        },
+        "right": {
+          "feature": "dist_enemy_flag",
+          "left": {
+            "feature": "dist_home_prison",
+            "left": {
+              "counts": {
+                "down": 2,
+                "right": 19,
+                "up": 4
+              },
+              "type": "leaf"
+            },
+            "right": {
+              "feature": "dist_enemy_flag",
+              "left": {
+                "feature": "dist_enemy_flag",
+                "left": {
+                  "feature": "y",
+                  "left": {
+                    "feature": "dist_home_prison",
+                    "left": {
+                      "counts": {
+                        "right": 10,
+                        "up": 1
+                      },
+                      "type": "leaf"
+                    },
+                    "right": {
+                      "feature": "dist_home_prison",
+                      "left": {
+                        "counts": {
+                          "right": 77
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "right": 20,
+                          "up": 1
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 25.5,
+                      "type": "node"
+                    },
+                    "threshold": 18.5,
+                    "type": "node"
+                  },
+                  "right": {
+                    "counts": {
+                      "down": 1,
+                      "right": 17,
+                      "up": 1
+                    },
+                    "type": "leaf"
+                  },
+                  "threshold": 7.5,
+                  "type": "node"
+                },
+                "right": {
+                  "feature": "y",
+                  "left": {
+                    "counts": {
+                      "down": 3,
+                      "right": 13
+                    },
+                    "type": "leaf"
+                  },
+                  "right": {
+                    "feature": "dist_nearest_opp",
+                    "left": {
+                      "counts": {
+                        "right": 23,
+                        "up": 3
+                      },
+                      "type": "leaf"
+                    },
+                    "right": {
+                      "feature": "y",
+                      "left": {
+                        "counts": {
+                          "down": 2,
+                          "right": 13
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "right": 37,
+                          "up": 1
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 2.5,
+                      "type": "node"
+                    },
+                    "threshold": 2.5,
+                    "type": "node"
+                  },
+                  "threshold": 1.5,
+                  "type": "node"
+                },
+                "threshold": 8.5,
+                "type": "node"
+              },
+              "right": {
+                "counts": {
+                  "right": 89
+                },
+                "type": "leaf"
+              },
+              "threshold": 11.5,
+              "type": "node"
+            },
+            "threshold": 11.5,
+            "type": "node"
+          },
+          "right": {
+            "feature": "dist_home_prison",
+            "left": {
+              "counts": {
+                "right": 10
+              },
+              "type": "leaf"
+            },
+            "right": {
+              "counts": {
+                "down": 10,
+                "right": 16,
+                "up": 3
+              },
+              "type": "leaf"
+            },
+            "threshold": 12.5,
+            "type": "node"
+          },
+          "threshold": 15.5,
+          "type": "node"
+        },
+        "threshold": 8.5,
+        "type": "node"
+      },
+      "right": {
+        "feature": "dist_home_prison",
+        "left": {
+          "feature": "x",
+          "left": {
+            "counts": {
+              "down": 9,
+              "left": 11
+            },
+            "type": "leaf"
+          },
+          "right": {
+            "feature": "dist_home_prison",
+            "left": {
+              "feature": "dist_home_prison",
+              "left": {
+                "feature": "dist_nearest_opp",
+                "left": {
+                  "counts": {
+                    "left": 21
+                  },
+                  "type": "leaf"
+                },
+                "right": {
+                  "counts": {
+                    "down": 2,
+                    "left": 22,
+                    "up": 1
+                  },
+                  "type": "leaf"
+                },
+                "threshold": 509.0,
+                "type": "node"
+              },
+              "right": {
+                "feature": "num_opp_prisoners",
+                "left": {
+                  "counts": {
+                    "down": 8,
+                    "left": 4,
+                    "up": 1
+                  },
+                  "type": "leaf"
+                },
+                "right": {
+                  "counts": {
+                    "down": 4,
+                    "left": 15
+                  },
+                  "type": "leaf"
+                },
+                "threshold": 0.5,
+                "type": "node"
+              },
+              "threshold": 14.5,
+              "type": "node"
+            },
+            "right": {
+              "feature": "dist_enemy_flag",
+              "left": {
+                "counts": {
+                  "down": 3,
+                  "left": 12
+                },
+                "type": "leaf"
+              },
+              "right": {
+                "feature": "dist_nearest_opp_carrier",
+                "left": {
+                  "feature": "num_opp_prisoners",
+                  "left": {
+                    "counts": {
+                      "left": 21
+                    },
+                    "type": "leaf"
+                  },
+                  "right": {
+                    "counts": {
+                      "down": 2,
+                      "left": 8
+                    },
+                    "type": "leaf"
+                  },
+                  "threshold": 1.5,
+                  "type": "node"
+                },
+                "right": {
+                  "counts": {
+                    "left": 34
+                  },
+                  "type": "leaf"
+                },
+                "threshold": 13.5,
+                "type": "node"
+              },
+              "threshold": 1.5,
+              "type": "node"
+            },
+            "threshold": 17.5,
+            "type": "node"
+          },
+          "threshold": 4.5,
+          "type": "node"
+        },
+        "right": {
+          "feature": "y",
+          "left": {
+            "counts": {
+              "down": 30
+            },
+            "type": "leaf"
+          },
+          "right": {
+            "counts": {
+              "down": 18,
+              "left": 6,
+              "up": 1
+            },
+            "type": "leaf"
+          },
+          "threshold": 5.5,
+          "type": "node"
+        },
+        "threshold": 23.5,
+        "type": "node"
+      },
+      "threshold": 0.5,
+      "type": "node"
+    },
+    "right": {
+      "counts": {
+        "": 838
+      },
+      "type": "leaf"
+    },
+    "threshold": 0.5,
+    "type": "node"
+  },
+  "team": "L",
+  "version": 1
+}

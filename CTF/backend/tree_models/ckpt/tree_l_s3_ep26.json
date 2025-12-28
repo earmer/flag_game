@@ -1,0 +1,1363 @@
+{
+  "feature_names": [
+    "blocked_down",
+    "blocked_left",
+    "blocked_right",
+    "blocked_up",
+    "dist_enemy_flag",
+    "dist_home_prison",
+    "dist_home_target",
+    "dist_nearest_opp",
+    "dist_nearest_opp_carrier",
+    "has_flag",
+    "in_prison",
+    "is_safe",
+    "num_intruders_with_flag",
+    "num_my_prisoners",
+    "num_opp_prisoners",
+    "x",
+    "y"
+  ],
+  "labels": [
+    "",
+    "up",
+    "down",
+    "left",
+    "right"
+  ],
+  "max_depth": 10,
+  "min_samples_leaf": 10,
+  "min_samples_split": 30,
+  "root": {
+    "feature": "has_flag",
+    "left": {
+      "feature": "y",
+      "left": {
+        "feature": "num_opp_prisoners",
+        "left": {
+          "feature": "dist_nearest_opp_carrier",
+          "left": {
+            "feature": "num_intruders_with_flag",
+            "left": {
+              "feature": "x",
+              "left": {
+                "feature": "dist_nearest_opp",
+                "left": {
+                  "counts": {
+                    "": 4,
+                    "down": 3,
+                    "up": 4
+                  },
+                  "type": "leaf"
+                },
+                "right": {
+                  "feature": "dist_nearest_opp",
+                  "left": {
+                    "feature": "y",
+                    "left": {
+                      "feature": "blocked_left",
+                      "left": {
+                        "counts": {
+                          "": 356,
+                          "right": 1
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "": 25,
+                          "down": 2
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 0.5,
+                      "type": "node"
+                    },
+                    "right": {
+                      "feature": "num_opp_prisoners",
+                      "left": {
+                        "counts": {
+                          "": 168,
+                          "down": 5,
+                          "right": 3,
+                          "up": 4
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "": 6,
+                          "down": 2,
+                          "left": 1,
+                          "right": 1,
+                          "up": 1
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 0.5,
+                      "type": "node"
+                    },
+                    "threshold": 5.5,
+                    "type": "node"
+                  },
+                  "right": {
+                    "feature": "y",
+                    "left": {
+                      "feature": "dist_home_prison",
+                      "left": {
+                        "counts": {
+                          "": 21
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "": 7,
+                          "right": 3
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 18.5,
+                      "type": "node"
+                    },
+                    "right": {
+                      "counts": {
+                        "": 1,
+                        "right": 4,
+                        "up": 5
+                      },
+                      "type": "leaf"
+                    },
+                    "threshold": 4.5,
+                    "type": "node"
+                  },
+                  "threshold": 11.5,
+                  "type": "node"
+                },
+                "threshold": 1.5,
+                "type": "node"
+              },
+              "right": {
+                "counts": {
+                  "right": 9,
+                  "up": 1
+                },
+                "type": "leaf"
+              },
+              "threshold": 16.5,
+              "type": "node"
+            },
+            "right": {
+              "feature": "dist_enemy_flag",
+              "left": {
+                "feature": "y",
+                "left": {
+                  "counts": {
+                    "": 2,
+                    "down": 6,
+                    "right": 7
+                  },
+                  "type": "leaf"
+                },
+                "right": {
+                  "counts": {
+                    "": 13,
+                    "down": 4,
+                    "right": 1,
+                    "up": 4
+                  },
+                  "type": "leaf"
+                },
+                "threshold": 6.5,
+                "type": "node"
+              },
+              "right": {
+                "counts": {
+                  "down": 7,
+                  "left": 6,
+                  "up": 3
+                },
+                "type": "leaf"
+              },
+              "threshold": 10.5,
+              "type": "node"
+            },
+            "threshold": 2.5,
+            "type": "node"
+          },
+          "right": {
+            "feature": "dist_enemy_flag",
+            "left": {
+              "feature": "x",
+              "left": {
+                "feature": "blocked_right",
+                "left": {
+                  "feature": "dist_home_prison",
+                  "left": {
+                    "feature": "dist_nearest_opp",
+                    "left": {
+                      "feature": "y",
+                      "left": {
+                        "counts": {
+                          "": 3,
+                          "down": 2,
+                          "right": 3,
+                          "up": 2
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "": 7,
+                          "down": 7,
+                          "right": 35,
+                          "up": 2
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 5.5,
+                      "type": "node"
+                    },
+                    "right": {
+                      "feature": "y",
+                      "left": {
+                        "counts": {
+                          "": 11,
+                          "down": 10,
+                          "right": 19,
+                          "up": 1
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "": 5,
+                          "down": 18,
+                          "right": 11,
+                          "up": 3
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 5.5,
+                      "type": "node"
+                    },
+                    "threshold": 8.5,
+                    "type": "node"
+                  },
+                  "right": {
+                    "feature": "blocked_up",
+                    "left": {
+                      "feature": "dist_nearest_opp",
+                      "left": {
+                        "counts": {
+                          "": 33,
+                          "down": 12,
+                          "left": 1,
+                          "right": 65,
+                          "up": 7
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "": 58,
+                          "down": 7,
+                          "right": 42
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 7.5,
+                      "type": "node"
+                    },
+                    "right": {
+                      "feature": "dist_home_prison",
+                      "left": {
+                        "counts": {
+                          "": 3,
+                          "down": 1,
+                          "right": 22
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "": 12,
+                          "down": 2,
+                          "right": 25
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 16.5,
+                      "type": "node"
+                    },
+                    "threshold": 0.5,
+                    "type": "node"
+                  },
+                  "threshold": 13.5,
+                  "type": "node"
+                },
+                "right": {
+                  "feature": "y",
+                  "left": {
+                    "feature": "dist_enemy_flag",
+                    "left": {
+                      "counts": {
+                        "": 22
+                      },
+                      "type": "leaf"
+                    },
+                    "right": {
+                      "counts": {
+                        "": 11,
+                        "down": 1
+                      },
+                      "type": "leaf"
+                    },
+                    "threshold": 11.5,
+                    "type": "node"
+                  },
+                  "right": {
+                    "counts": {
+                      "": 12,
+                      "down": 3,
+                      "up": 5
+                    },
+                    "type": "leaf"
+                  },
+                  "threshold": 3.5,
+                  "type": "node"
+                },
+                "threshold": 0.5,
+                "type": "node"
+              },
+              "right": {
+                "feature": "num_opp_prisoners",
+                "left": {
+                  "feature": "dist_nearest_opp",
+                  "left": {
+                    "feature": "num_my_prisoners",
+                    "left": {
+                      "feature": "y",
+                      "left": {
+                        "counts": {
+                          "": 157,
+                          "right": 12
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "": 87,
+                          "down": 1,
+                          "right": 17
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 3.5,
+                      "type": "node"
+                    },
+                    "right": {
+                      "counts": {
+                        "": 3,
+                        "right": 7
+                      },
+                      "type": "leaf"
+                    },
+                    "threshold": 1.5,
+                    "type": "node"
+                  },
+                  "right": {
+                    "counts": {
+                      "": 3,
+                      "right": 19,
+                      "up": 2
+                    },
+                    "type": "leaf"
+                  },
+                  "threshold": 12.5,
+                  "type": "node"
+                },
+                "right": {
+                  "feature": "y",
+                  "left": {
+                    "counts": {
+                      "": 6,
+                      "right": 15,
+                      "up": 1
+                    },
+                    "type": "leaf"
+                  },
+                  "right": {
+                    "counts": {
+                      "right": 15
+                    },
+                    "type": "leaf"
+                  },
+                  "threshold": 3.5,
+                  "type": "node"
+                },
+                "threshold": 0.5,
+                "type": "node"
+              },
+              "threshold": 8.5,
+              "type": "node"
+            },
+            "right": {
+              "feature": "dist_nearest_opp",
+              "left": {
+                "feature": "dist_nearest_opp",
+                "left": {
+                  "counts": {
+                    "": 8,
+                    "right": 1,
+                    "up": 1
+                  },
+                  "type": "leaf"
+                },
+                "right": {
+                  "feature": "dist_home_prison",
+                  "left": {
+                    "counts": {
+                      "": 41
+                    },
+                    "type": "leaf"
+                  },
+                  "right": {
+                    "feature": "dist_home_prison",
+                    "left": {
+                      "counts": {
+                        "": 12,
+                        "up": 1
+                      },
+                      "type": "leaf"
+                    },
+                    "right": {
+                      "counts": {
+                        "": 19
+                      },
+                      "type": "leaf"
+                    },
+                    "threshold": 13.5,
+                    "type": "node"
+                  },
+                  "threshold": 11.0,
+                  "type": "node"
+                },
+                "threshold": 4.5,
+                "type": "node"
+              },
+              "right": {
+                "feature": "dist_nearest_opp",
+                "left": {
+                  "feature": "blocked_left",
+                  "left": {
+                    "feature": "dist_nearest_opp",
+                    "left": {
+                      "counts": {
+                        "": 13,
+                        "down": 3,
+                        "right": 4
+                      },
+                      "type": "leaf"
+                    },
+                    "right": {
+                      "feature": "dist_home_prison",
+                      "left": {
+                        "counts": {
+                          "": 32,
+                          "down": 28,
+                          "right": 2,
+                          "up": 1
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "": 61,
+                          "down": 45,
+                          "right": 26,
+                          "up": 8
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 11.5,
+                      "type": "node"
+                    },
+                    "threshold": 12.5,
+                    "type": "node"
+                  },
+                  "right": {
+                    "counts": {
+                      "": 11,
+                      "down": 1,
+                      "right": 3
+                    },
+                    "type": "leaf"
+                  },
+                  "threshold": 0.5,
+                  "type": "node"
+                },
+                "right": {
+                  "feature": "dist_home_prison",
+                  "left": {
+                    "counts": {
+                      "": 12,
+                      "down": 6,
+                      "right": 1,
+                      "up": 2
+                    },
+                    "type": "leaf"
+                  },
+                  "right": {
+                    "counts": {
+                      "": 43
+                    },
+                    "type": "leaf"
+                  },
+                  "threshold": 12.5,
+                  "type": "node"
+                },
+                "threshold": 15.5,
+                "type": "node"
+              },
+              "threshold": 10.5,
+              "type": "node"
+            },
+            "threshold": 15.5,
+            "type": "node"
+          },
+          "threshold": 14.5,
+          "type": "node"
+        },
+        "right": {
+          "feature": "y",
+          "left": {
+            "feature": "dist_home_prison",
+            "left": {
+              "feature": "x",
+              "left": {
+                "feature": "dist_home_prison",
+                "left": {
+                  "feature": "num_my_prisoners",
+                  "left": {
+                    "counts": {
+                      "": 1,
+                      "down": 1,
+                      "right": 12,
+                      "up": 11
+                    },
+                    "type": "leaf"
+                  },
+                  "right": {
+                    "counts": {
+                      "right": 4,
+                      "up": 6
+                    },
+                    "type": "leaf"
+                  },
+                  "threshold": 0.5,
+                  "type": "node"
+                },
+                "right": {
+                  "feature": "dist_nearest_opp",
+                  "left": {
+                    "counts": {
+                      "": 5,
+                      "down": 1,
+                      "left": 1,
+                      "right": 10,
+                      "up": 1
+                    },
+                    "type": "leaf"
+                  },
+                  "right": {
+                    "feature": "dist_enemy_flag",
+                    "left": {
+                      "feature": "blocked_up",
+                      "left": {
+                        "counts": {
+                          "down": 4,
+                          "left": 1,
+                          "right": 55,
+                          "up": 6
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "right": 13
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 0.5,
+                      "type": "node"
+                    },
+                    "right": {
+                      "counts": {
+                        "right": 15
+                      },
+                      "type": "leaf"
+                    },
+                    "threshold": 13.5,
+                    "type": "node"
+                  },
+                  "threshold": 507.5,
+                  "type": "node"
+                },
+                "threshold": 8.5,
+                "type": "node"
+              },
+              "right": {
+                "feature": "dist_home_prison",
+                "left": {
+                  "counts": {
+                    "": 17,
+                    "down": 3,
+                    "right": 1
+                  },
+                  "type": "leaf"
+                },
+                "right": {
+                  "counts": {
+                    "": 4,
+                    "down": 1,
+                    "right": 16,
+                    "up": 4
+                  },
+                  "type": "leaf"
+                },
+                "threshold": 13.5,
+                "type": "node"
+              },
+              "threshold": 8.5,
+              "type": "node"
+            },
+            "right": {
+              "feature": "dist_enemy_flag",
+              "left": {
+                "feature": "dist_enemy_flag",
+                "left": {
+                  "feature": "x",
+                  "left": {
+                    "counts": {
+                      "right": 62
+                    },
+                    "type": "leaf"
+                  },
+                  "right": {
+                    "feature": "dist_enemy_flag",
+                    "left": {
+                      "counts": {
+                        "right": 55
+                      },
+                      "type": "leaf"
+                    },
+                    "right": {
+                      "feature": "dist_home_prison",
+                      "left": {
+                        "counts": {
+                          "down": 2,
+                          "right": 22,
+                          "up": 2
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "right": 14,
+                          "up": 1
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 21.5,
+                      "type": "node"
+                    },
+                    "threshold": 2.5,
+                    "type": "node"
+                  },
+                  "threshold": 14.5,
+                  "type": "node"
+                },
+                "right": {
+                  "feature": "y",
+                  "left": {
+                    "counts": {
+                      "down": 2,
+                      "right": 8
+                    },
+                    "type": "leaf"
+                  },
+                  "right": {
+                    "feature": "dist_enemy_flag",
+                    "left": {
+                      "feature": "dist_home_prison",
+                      "left": {
+                        "counts": {
+                          "down": 4,
+                          "right": 40,
+                          "up": 4
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "right": 14
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 19.5,
+                      "type": "node"
+                    },
+                    "right": {
+                      "counts": {
+                        "right": 38
+                      },
+                      "type": "leaf"
+                    },
+                    "threshold": 7.5,
+                    "type": "node"
+                  },
+                  "threshold": 1.5,
+                  "type": "node"
+                },
+                "threshold": 5.5,
+                "type": "node"
+              },
+              "right": {
+                "counts": {
+                  "down": 3,
+                  "right": 17,
+                  "up": 4
+                },
+                "type": "leaf"
+              },
+              "threshold": 9.5,
+              "type": "node"
+            },
+            "threshold": 14.5,
+            "type": "node"
+          },
+          "right": {
+            "feature": "dist_enemy_flag",
+            "left": {
+              "counts": {
+                "right": 15,
+                "up": 9
+              },
+              "type": "leaf"
+            },
+            "right": {
+              "feature": "blocked_down",
+              "left": {
+                "feature": "dist_enemy_flag",
+                "left": {
+                  "counts": {
+                    "": 2,
+                    "down": 7,
+                    "up": 2
+                  },
+                  "type": "leaf"
+                },
+                "right": {
+                  "counts": {
+                    "": 10,
+                    "down": 6,
+                    "right": 2,
+                    "up": 4
+                  },
+                  "type": "leaf"
+                },
+                "threshold": 10.5,
+                "type": "node"
+              },
+              "right": {
+                "counts": {
+                  "": 14
+                },
+                "type": "leaf"
+              },
+              "threshold": 0.5,
+              "type": "node"
+            },
+            "threshold": 9.5,
+            "type": "node"
+          },
+          "threshold": 9.5,
+          "type": "node"
+        },
+        "threshold": 1.5,
+        "type": "node"
+      },
+      "right": {
+        "feature": "num_my_prisoners",
+        "left": {
+          "feature": "dist_home_prison",
+          "left": {
+            "feature": "dist_home_prison",
+            "left": {
+              "counts": {
+                "": 1,
+                "up": 17
+              },
+              "type": "leaf"
+            },
+            "right": {
+              "counts": {
+                "up": 27
+              },
+              "type": "leaf"
+            },
+            "threshold": 0.5,
+            "type": "node"
+          },
+          "right": {
+            "feature": "is_safe",
+            "left": {
+              "counts": {
+                "up": 11
+              },
+              "type": "leaf"
+            },
+            "right": {
+              "feature": "dist_nearest_opp",
+              "left": {
+                "feature": "y",
+                "left": {
+                  "feature": "dist_enemy_flag",
+                  "left": {
+                    "feature": "dist_enemy_flag",
+                    "left": {
+                      "feature": "dist_nearest_opp_carrier",
+                      "left": {
+                        "counts": {
+                          "": 9,
+                          "left": 1
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "": 26
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 8.5,
+                      "type": "node"
+                    },
+                    "right": {
+                      "counts": {
+                        "": 12,
+                        "right": 3
+                      },
+                      "type": "leaf"
+                    },
+                    "threshold": 13.5,
+                    "type": "node"
+                  },
+                  "right": {
+                    "counts": {
+                      "": 133
+                    },
+                    "type": "leaf"
+                  },
+                  "threshold": 15.5,
+                  "type": "node"
+                },
+                "right": {
+                  "counts": {
+                    "": 16,
+                    "up": 3
+                  },
+                  "type": "leaf"
+                },
+                "threshold": 11.5,
+                "type": "node"
+              },
+              "right": {
+                "feature": "x",
+                "left": {
+                  "feature": "dist_nearest_opp",
+                  "left": {
+                    "feature": "x",
+                    "left": {
+                      "feature": "dist_nearest_opp",
+                      "left": {
+                        "counts": {
+                          "": 22
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "": 10,
+                          "right": 1
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 10.5,
+                      "type": "node"
+                    },
+                    "right": {
+                      "counts": {
+                        "": 4,
+                        "right": 13,
+                        "up": 2
+                      },
+                      "type": "leaf"
+                    },
+                    "threshold": 3.5,
+                    "type": "node"
+                  },
+                  "right": {
+                    "feature": "y",
+                    "left": {
+                      "feature": "dist_enemy_flag",
+                      "left": {
+                        "counts": {
+                          "down": 1,
+                          "right": 11,
+                          "up": 1
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "down": 1,
+                          "right": 24
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 13.5,
+                      "type": "node"
+                    },
+                    "right": {
+                      "counts": {
+                        "down": 1,
+                        "right": 9,
+                        "up": 5
+                      },
+                      "type": "leaf"
+                    },
+                    "threshold": 11.5,
+                    "type": "node"
+                  },
+                  "threshold": 13.5,
+                  "type": "node"
+                },
+                "right": {
+                  "feature": "dist_home_prison",
+                  "left": {
+                    "feature": "dist_enemy_flag",
+                    "left": {
+                      "counts": {
+                        "": 28,
+                        "up": 4
+                      },
+                      "type": "leaf"
+                    },
+                    "right": {
+                      "counts": {
+                        "": 28
+                      },
+                      "type": "leaf"
+                    },
+                    "threshold": 12.5,
+                    "type": "node"
+                  },
+                  "right": {
+                    "feature": "blocked_down",
+                    "left": {
+                      "feature": "dist_enemy_flag",
+                      "left": {
+                        "counts": {
+                          "": 83,
+                          "down": 4
+                        },
+                        "type": "leaf"
+                      },
+                      "right": {
+                        "counts": {
+                          "": 10
+                        },
+                        "type": "leaf"
+                      },
+                      "threshold": 12.5,
+                      "type": "node"
+                    },
+                    "right": {
+                      "counts": {
+                        "": 14
+                      },
+                      "type": "leaf"
+                    },
+                    "threshold": 0.5,
+                    "type": "node"
+                  },
+                  "threshold": 10.5,
+                  "type": "node"
+                },
+                "threshold": 8.5,
+                "type": "node"
+              },
+              "threshold": 9.5,
+              "type": "node"
+            },
+            "threshold": 0.5,
+            "type": "node"
+          },
+          "threshold": 3.5,
+          "type": "node"
+        },
+        "right": {
+          "feature": "dist_home_target",
+          "left": {
+            "counts": {
+              "": 19,
+              "up": 1
+            },
+            "type": "leaf"
+          },
+          "right": {
+            "counts": {
+              "": 1251
+            },
+            "type": "leaf"
+          },
+          "threshold": 0.5,
+          "type": "node"
+        },
+        "threshold": 0.5,
+        "type": "node"
+      },
+      "threshold": 10.5,
+      "type": "node"
+    },
+    "right": {
+      "feature": "blocked_right",
+      "left": {
+        "feature": "is_safe",
+        "left": {
+          "feature": "dist_nearest_opp",
+          "left": {
+            "feature": "dist_home_prison",
+            "left": {
+              "counts": {
+                "down": 4,
+                "left": 16,
+                "up": 1
+              },
+              "type": "leaf"
+            },
+            "right": {
+              "counts": {
+                "": 6,
+                "down": 1,
+                "left": 4
+              },
+              "type": "leaf"
+            },
+            "threshold": 18.5,
+            "type": "node"
+          },
+          "right": {
+            "feature": "num_my_prisoners",
+            "left": {
+              "feature": "dist_nearest_opp",
+              "left": {
+                "feature": "dist_nearest_opp",
+                "left": {
+                  "counts": {
+                    "left": 34
+                  },
+                  "type": "leaf"
+                },
+                "right": {
+                  "counts": {
+                    "": 1,
+                    "down": 2,
+                    "left": 16
+                  },
+                  "type": "leaf"
+                },
+                "threshold": 12.5,
+                "type": "node"
+              },
+              "right": {
+                "feature": "dist_enemy_flag",
+                "left": {
+                  "feature": "dist_home_prison",
+                  "left": {
+                    "counts": {
+                      "left": 21
+                    },
+                    "type": "leaf"
+                  },
+                  "right": {
+                    "counts": {
+                      "left": 9,
+                      "up": 1
+                    },
+                    "type": "leaf"
+                  },
+                  "threshold": 23.5,
+                  "type": "node"
+                },
+                "right": {
+                  "counts": {
+                    "left": 145
+                  },
+                  "type": "leaf"
+                },
+                "threshold": 2.5,
+                "type": "node"
+              },
+              "threshold": 14.5,
+              "type": "node"
+            },
+            "right": {
+              "feature": "x",
+              "left": {
+                "counts": {
+                  "down": 3,
+                  "left": 7,
+                  "up": 1
+                },
+                "type": "leaf"
+              },
+              "right": {
+                "feature": "y",
+                "left": {
+                  "counts": {
+                    "down": 5,
+                    "left": 18
+                  },
+                  "type": "leaf"
+                },
+                "right": {
+                  "counts": {
+                    "left": 23
+                  },
+                  "type": "leaf"
+                },
+                "threshold": 7.5,
+                "type": "node"
+              },
+              "threshold": 12.5,
+              "type": "node"
+            },
+            "threshold": 0.5,
+            "type": "node"
+          },
+          "threshold": 5.5,
+          "type": "node"
+        },
+        "right": {
+          "feature": "dist_home_prison",
+          "left": {
+            "feature": "y",
+            "left": {
+              "feature": "dist_home_prison",
+              "left": {
+                "counts": {
+                  "down": 14,
+                  "left": 7
+                },
+                "type": "leaf"
+              },
+              "right": {
+                "counts": {
+                  "down": 3,
+                  "left": 21
+                },
+                "type": "leaf"
+              },
+              "threshold": 10.5,
+              "type": "node"
+            },
+            "right": {
+              "feature": "dist_enemy_flag",
+              "left": {
+                "counts": {
+                  "down": 3,
+                  "left": 23
+                },
+                "type": "leaf"
+              },
+              "right": {
+                "counts": {
+                  "left": 87
+                },
+                "type": "leaf"
+              },
+              "threshold": 10.5,
+              "type": "node"
+            },
+            "threshold": 8.5,
+            "type": "node"
+          },
+          "right": {
+            "feature": "dist_nearest_opp",
+            "left": {
+              "counts": {
+                "down": 3,
+                "left": 7
+              },
+              "type": "leaf"
+            },
+            "right": {
+              "feature": "dist_home_prison",
+              "left": {
+                "feature": "y",
+                "left": {
+                  "counts": {
+                    "down": 10,
+                    "left": 3
+                  },
+                  "type": "leaf"
+                },
+                "right": {
+                  "feature": "y",
+                  "left": {
+                    "counts": {
+                      "down": 14,
+                      "left": 1
+                    },
+                    "type": "leaf"
+                  },
+                  "right": {
+                    "counts": {
+                      "down": 12,
+                      "left": 3
+                    },
+                    "type": "leaf"
+                  },
+                  "threshold": 7.5,
+                  "type": "node"
+                },
+                "threshold": 6.5,
+                "type": "node"
+              },
+              "right": {
+                "counts": {
+                  "down": 19
+                },
+                "type": "leaf"
+              },
+              "threshold": 16.5,
+              "type": "node"
+            },
+            "threshold": 506.0,
+            "type": "node"
+          },
+          "threshold": 13.5,
+          "type": "node"
+        },
+        "threshold": 0.5,
+        "type": "node"
+      },
+      "right": {
+        "feature": "dist_nearest_opp",
+        "left": {
+          "feature": "num_my_prisoners",
+          "left": {
+            "counts": {
+              "": 13,
+              "down": 3,
+              "left": 4,
+              "up": 1
+            },
+            "type": "leaf"
+          },
+          "right": {
+            "counts": {
+              "": 13,
+              "down": 1
+            },
+            "type": "leaf"
+          },
+          "threshold": 0.5,
+          "type": "node"
+        },
+        "right": {
+          "feature": "y",
+          "left": {
+            "feature": "num_my_prisoners",
+            "left": {
+              "feature": "num_intruders_with_flag",
+              "left": {
+                "counts": {
+                  "": 2,
+                  "down": 13,
+                  "left": 9
+                },
+                "type": "leaf"
+              },
+              "right": {
+                "counts": {
+                  "down": 3,
+                  "left": 6,
+                  "up": 1
+                },
+                "type": "leaf"
+              },
+              "threshold": 2.5,
+              "type": "node"
+            },
+            "right": {
+              "feature": "num_my_prisoners",
+              "left": {
+                "counts": {
+                  "": 1,
+                  "down": 24
+                },
+                "type": "leaf"
+              },
+              "right": {
+                "counts": {
+                  "down": 13,
+                  "left": 4,
+                  "up": 1
+                },
+                "type": "leaf"
+              },
+              "threshold": 1.5,
+              "type": "node"
+            },
+            "threshold": 0.5,
+            "type": "node"
+          },
+          "right": {
+            "feature": "dist_enemy_flag",
+            "left": {
+              "counts": {
+                "down": 2,
+                "left": 16,
+                "up": 5
+              },
+              "type": "leaf"
+            },
+            "right": {
+              "counts": {
+                "down": 2,
+                "left": 10
+              },
+              "type": "leaf"
+            },
+            "threshold": 5.5,
+            "type": "node"
+          },
+          "threshold": 7.5,
+          "type": "node"
+        },
+        "threshold": 12.5,
+        "type": "node"
+      },
+      "threshold": 0.5,
+      "type": "node"
+    },
+    "threshold": 0.5,
+    "type": "node"
+  },
+  "team": "L",
+  "version": 1
+}

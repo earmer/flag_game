@@ -1,0 +1,136 @@
+{
+  "feature_names": [
+    "blocked_down",
+    "blocked_left",
+    "blocked_right",
+    "blocked_up",
+    "dist_enemy_flag",
+    "dist_home_prison",
+    "dist_home_target",
+    "dist_nearest_opp",
+    "dist_nearest_opp_carrier",
+    "has_flag",
+    "in_prison",
+    "is_safe",
+    "num_intruders_with_flag",
+    "num_my_prisoners",
+    "num_opp_prisoners",
+    "x",
+    "y"
+  ],
+  "labels": [
+    "",
+    "up",
+    "down",
+    "left",
+    "right"
+  ],
+  "max_depth": 10,
+  "min_samples_leaf": 10,
+  "min_samples_split": 30,
+  "root": {
+    "feature": "dist_home_prison",
+    "left": {
+      "counts": {
+        "": 156
+      },
+      "type": "leaf"
+    },
+    "right": {
+      "feature": "has_flag",
+      "left": {
+        "feature": "dist_home_prison",
+        "left": {
+          "counts": {
+            "right": 1,
+            "up": 16
+          },
+          "type": "leaf"
+        },
+        "right": {
+          "feature": "dist_nearest_opp",
+          "left": {
+            "feature": "y",
+            "left": {
+              "counts": {
+                "down": 3,
+                "right": 17
+              },
+              "type": "leaf"
+            },
+            "right": {
+              "counts": {
+                "right": 14,
+                "up": 1
+              },
+              "type": "leaf"
+            },
+            "threshold": 2.5,
+            "type": "node"
+          },
+          "right": {
+            "counts": {
+              "right": 76
+            },
+            "type": "leaf"
+          },
+          "threshold": 6.5,
+          "type": "node"
+        },
+        "threshold": 8.5,
+        "type": "node"
+      },
+      "right": {
+        "feature": "dist_home_prison",
+        "left": {
+          "feature": "dist_home_prison",
+          "left": {
+            "feature": "is_safe",
+            "left": {
+              "counts": {
+                "down": 5,
+                "left": 8,
+                "up": 2
+              },
+              "type": "leaf"
+            },
+            "right": {
+              "counts": {
+                "down": 2,
+                "left": 21
+              },
+              "type": "leaf"
+            },
+            "threshold": 0.5,
+            "type": "node"
+          },
+          "right": {
+            "counts": {
+              "down": 1,
+              "left": 26
+            },
+            "type": "leaf"
+          },
+          "threshold": 16.5,
+          "type": "node"
+        },
+        "right": {
+          "counts": {
+            "down": 15,
+            "left": 2,
+            "up": 1
+          },
+          "type": "leaf"
+        },
+        "threshold": 23.5,
+        "type": "node"
+      },
+      "threshold": 0.5,
+      "type": "node"
+    },
+    "threshold": 0.5,
+    "type": "node"
+  },
+  "team": "L",
+  "version": 1
+}

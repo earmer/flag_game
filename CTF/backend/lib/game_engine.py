@@ -4,9 +4,12 @@ import collections
 import json
 import threading
 import random
-import websockets
 
-from IPython.display import clear_output
+try:
+    from IPython.display import clear_output  # type: ignore
+except Exception:  # pragma: no cover
+    def clear_output(*_args, **_kwargs):  # type: ignore
+        return None
 
 class GameMap(ABC):
     def __init__(self, show_gap_in_msec = 1000.0):
@@ -180,6 +183,11 @@ class GameMap(ABC):
 
 
 async def run_game_server(port, start_fn, plan_fn, end_fn):
+    try:
+        import websockets  # type: ignore
+    except Exception as exc:  # pragma: no cover
+        raise RuntimeError("Missing dependency: websockets (required to run the WebSocket server)") from exc
+
     lock = threading.Lock()
     async def handler(websocket):
         print(f"Connected on port {port}")

@@ -12,8 +12,8 @@ export class Game extends Phaser.Scene {
     }
 
     create() {
-      // do nothing
-      // we only do in create_after_preload()
+        // do nothing
+        // we only do in create_after_preload()
     }
 
     create_after_preload() {
@@ -39,9 +39,9 @@ export class Game extends Phaser.Scene {
 
     startOrPauseOrContinue() {
         if (!this.gameStarted) {
-          this.startGame();
+            this.startGame();
         } else {
-          this.gamePaused = !this.gamePaused;
+            this.gamePaused = !this.gamePaused;
         }
     }
 
@@ -51,24 +51,24 @@ export class Game extends Phaser.Scene {
         let players_ready = 0, total_players = 0;
 
         let tick = (/** @type {string} */ can_go_next_tile) => {
-            this.lteamPlayers.getChildren().forEach( player => {
+            this.lteamPlayers.getChildren().forEach(player => {
                 ++total_players;
                 player.can_go_next_tile |= can_go_next_tile;
                 player.update(time, delta);
-                if(player.x == player.target.x && player.y == player.target.y)
+                if (player.x == player.target.x && player.y == player.target.y)
                     ++players_ready;
             });
-            this.rteamPlayers.getChildren().forEach( player => {
+            this.rteamPlayers.getChildren().forEach(player => {
                 ++total_players;
                 player.can_go_next_tile |= can_go_next_tile;
                 player.update(time, delta);
-                if(player.x == player.target.x && player.y == player.target.y)
+                if (player.x == player.target.x && player.y == player.target.y)
                     ++players_ready;
             });
         };
         tick(false);
 
-        if(players_ready !== total_players) {
+        if (players_ready !== total_players) {
             this.stageSent = false;
             return;
         }
@@ -81,14 +81,14 @@ export class Game extends Phaser.Scene {
             this.stageSent = true;
 
             // notify server backend
-            let lteamPlayerStatus = this.lteamPlayers.getChildren().map( player => player.getStatus() );
-            let lteamFlagStatus = this.lteamFlags.getChildren().map( flag => flag.getStatus() );
-            let rteamPlayerStatus = this.rteamPlayers.getChildren().map( player => player.getStatus() );
-            let rteamFlagStatus = this.rteamFlags.getChildren().map( flag => flag.getStatus() );
+            let lteamPlayerStatus = this.lteamPlayers.getChildren().map(player => player.getStatus());
+            let lteamFlagStatus = this.lteamFlags.getChildren().map(flag => flag.getStatus());
+            let rteamPlayerStatus = this.rteamPlayers.getChildren().map(player => player.getStatus());
+            let rteamFlagStatus = this.rteamFlags.getChildren().map(flag => flag.getStatus());
 
             // each team gets its own perspective
             if (this.lteamSocket && this.lteamSocket.readyState == WebSocket.OPEN) {
-                const lteamPlayerStatus = this.lteamPlayers.getChildren().map( player => player.getStatus() );
+                const lteamPlayerStatus = this.lteamPlayers.getChildren().map(player => player.getStatus());
                 const payload = {
                     action: "status",
 
@@ -139,11 +139,11 @@ export class Game extends Phaser.Scene {
     updatePlayerInfo(teamName, data) {
         try {
             const actions = JSON.parse(data);
-            Object.keys(actions.players).forEach (p => {
+            Object.keys(actions.players).forEach(p => {
                 let d = actions.players[p];
                 console.assert(p.startsWith(teamName), `Invalid operation to control player ${p} for team ${teamName}`);
                 console.assert(d == "up" || d == "down" || d == "left" || d == "right",
-                     `Invalid operation to move player to direction ${d}`);
+                    `Invalid operation to move player to direction ${d}`);
             });
             let teamPlayers = null;
             if (teamName === "L") {
@@ -152,7 +152,7 @@ export class Game extends Phaser.Scene {
                 teamPlayers = this.rteamPlayers.getChildren();
             }
             // For each team player, we will set its direction.
-            teamPlayers.forEach ( player => {
+            teamPlayers.forEach(player => {
                 let remoteControl = actions.players[player.name];
                 player.setRemoteControl(remoteControl);
             })
@@ -186,7 +186,7 @@ export class Game extends Phaser.Scene {
                 }
             }
 
-            let ws =  team["ws_url"] == null ? new WebSocket(this.team_servers[team.who]) : new WebSocket(team.ws_url);
+            let ws = team["ws_url"] == null ? new WebSocket(this.team_servers[team.who]) : new WebSocket(team.ws_url);
             ws.onopen = () => console.log(`${team.name} connected`);
             ws.onmessage = (msg) => this.updatePlayerInfo(team.name, msg.data);
             ws.onerror = (err) => console.error("WebSocket error", err);
@@ -226,7 +226,7 @@ export class Game extends Phaser.Scene {
         this.mapY = this.centerY - (this.mapHeight * this.tileSize * 0.5); // y position of the top-left corner of the tile map
 
         // used to generate random background image
-        this.backgroundTiles = [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 3, 44 ];
+        this.backgroundTiles = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 3, 44];
         this.targetTiles = [13, 14, 15, 25, 26, 27, 37, 38, 39];
         this.prisonTiles = [97, 98, 99, 109, 110, 111, 121, 122, 123];
         this.wallTiles = [45, 46, 47, 57, 59, 69, 70, 71];
@@ -235,7 +235,7 @@ export class Game extends Phaser.Scene {
 
         // generate walls
         this.walls = [
-            {x: 0, y: 0, tileId: 45}, {x: this.mapWidth -1, y: 0, tileId: 47}, {x: 0, y: this.mapHeight - 1, tileId:69}, {x: this.mapWidth - 1, y: this.mapHeight - 1, tileId: 71}
+            { x: 0, y: 0, tileId: 45 }, { x: this.mapWidth - 1, y: 0, tileId: 47 }, { x: 0, y: this.mapHeight - 1, tileId: 69 }, { x: this.mapWidth - 1, y: this.mapHeight - 1, tileId: 71 }
         ].concat(
             Array.from({ length: this.mapWidth - 2 }, (_, i) => ({ x: i + 1, y: 0, tileId: 46 }))
         ).concat(
@@ -247,8 +247,8 @@ export class Game extends Phaser.Scene {
         );
 
         function notContains(xyArrays, x, y) {
-          const ret = xyArrays.find(obj => (obj.x === x && obj.y === y));
-          return ret == null;
+            const ret = xyArrays.find(obj => (obj.x === x && obj.y === y));
+            return ret == null;
         }
 
         // generate obstacles
@@ -258,13 +258,13 @@ export class Game extends Phaser.Scene {
                 const x = Phaser.Math.RND.integerInRange(4, this.mapWidth - 5);
                 const y = Phaser.Math.RND.integerInRange(1, this.mapHeight - 2);
                 if (notContains(this.obstacles1, x, y)) {
-                    this.obstacles1.push({x: x, y: y});
+                    this.obstacles1.push({ x: x, y: y });
                     break;
                 }
             }
         }
         this.obstacles2 = [];
-        for (let i = 0; i< this.NUM_OBSTACLES_2; ++i) {
+        for (let i = 0; i < this.NUM_OBSTACLES_2; ++i) {
             while (true) {
                 const x = Phaser.Math.RND.integerInRange(4, this.mapWidth - 5);
                 const y = Phaser.Math.RND.integerInRange(1, this.mapHeight - 3);
@@ -272,7 +272,7 @@ export class Game extends Phaser.Scene {
                     && notContains(this.obstacles1, x, y + 1)
                     && notContains(this.obstacles2, x, y - 1)
                     && notContains(this.obstacles2, x, y)) {
-                    this.obstacles2.push({x: x, y: y});
+                    this.obstacles2.push({ x: x, y: y });
                     break;
                 }
             }
@@ -280,7 +280,7 @@ export class Game extends Phaser.Scene {
 
         // Randomly generate flags
         let lFlags = [];
-        for (let i = 0; i< this.NUM_FLAGS; ++i) {
+        for (let i = 0; i < this.NUM_FLAGS; ++i) {
             while (true) {
                 const x = Phaser.Math.RND.integerInRange(2, this.mapWidth / 2 - 1);
                 const y = Phaser.Math.RND.integerInRange(1, this.mapHeight - 3);
@@ -288,13 +288,13 @@ export class Game extends Phaser.Scene {
                     && notContains(this.obstacles2, x, y - 1)
                     && notContains(this.obstacles2, x, y)
                     && notContains(lFlags, x, y)) {
-                    lFlags.push({x: x, y: y});
+                    lFlags.push({ x: x, y: y });
                     break;
                 }
             }
         }
         let rFlags = [];
-        for (let i = 0; i< this.NUM_FLAGS; ++i) {
+        for (let i = 0; i < this.NUM_FLAGS; ++i) {
             while (true) {
                 const x = Phaser.Math.RND.integerInRange(this.mapWidth / 2, this.mapWidth - 2);
                 const y = Phaser.Math.RND.integerInRange(1, this.mapHeight - 3);
@@ -303,7 +303,7 @@ export class Game extends Phaser.Scene {
                     && notContains(this.obstacles2, x, y)
                     && notContains(rFlags, x, y)) {
 
-                    rFlags.push({x: x, y: y});
+                    rFlags.push({ x: x, y: y });
                     break;
                 }
             }
@@ -314,8 +314,8 @@ export class Game extends Phaser.Scene {
         this.lteamState = {
             score: 0,
             player_sprite_choice: 1,
-            flags:  this.useRandomFlags ? lFlags : Array.from({ length: this.NUM_FLAGS }, (_, i) => ({ x: 1, y: i + 1})),
-            players: this.useRandomFlags? Array.from({ length: this.NUM_PLAYERS }, (_, i) => ({ x: 1, y: i + 1, name: "L" + i})) : Array.from({ length: this.NUM_PLAYERS }, (_, i) => ({ x: 2, y: i + 1, name: "L" + i})),
+            flags: this.useRandomFlags ? lFlags : Array.from({ length: this.NUM_FLAGS }, (_, i) => ({ x: 1, y: i + 1 })),
+            players: this.useRandomFlags ? Array.from({ length: this.NUM_PLAYERS }, (_, i) => ({ x: 1, y: i + 1, name: "L" + i })) : Array.from({ length: this.NUM_PLAYERS }, (_, i) => ({ x: 2, y: i + 1, name: "L" + i })),
             target: this.create3x3grid(2, this.mapHeight / 2),
             prison: this.create3x3grid(2, this.mapHeight - 3),
         };
@@ -325,8 +325,8 @@ export class Game extends Phaser.Scene {
             score: 0,
             player_sprite_choice: 4,
             // flags: Array.from({ length: this.NUM_FLAGS }, (_, i) => ({ x: this.mapWidth - 2, y: i + 1})),
-            flags: this.useRandomFlags ? rFlags : Array.from({ length: this.NUM_FLAGS }, (_, i) => ({ x: this.mapWidth - 2, y: i + 1})),
-            players: this.useRandomFlags ? Array.from({ length: this.NUM_PLAYERS }, (_, i) => ({ x: this.mapWidth - 2, y: i + 1, name: "R" + i})) : Array.from({ length: this.NUM_PLAYERS }, (_, i) => ({ x: this.mapWidth - 3, y: i + 1, name: "R" + i})),
+            flags: this.useRandomFlags ? rFlags : Array.from({ length: this.NUM_FLAGS }, (_, i) => ({ x: this.mapWidth - 2, y: i + 1 })),
+            players: this.useRandomFlags ? Array.from({ length: this.NUM_PLAYERS }, (_, i) => ({ x: this.mapWidth - 2, y: i + 1, name: "R" + i })) : Array.from({ length: this.NUM_PLAYERS }, (_, i) => ({ x: this.mapWidth - 3, y: i + 1, name: "R" + i })),
             target: this.create3x3grid(this.mapWidth - 3, this.mapHeight / 2),
             prison: this.create3x3grid(this.mapWidth - 3, this.mapHeight - 3),
         };
@@ -407,11 +407,11 @@ export class Game extends Phaser.Scene {
         this.lteamFlags = this.add.group();
         this.lteamPlayers = this.add.group();
 
-        this.lteamState.flags.forEach( flag => {
+        this.lteamState.flags.forEach(flag => {
             const flagObj = new Flag(this, flag.x, flag.y, "L", true);
             this.lteamFlags.add(flagObj);
         });
-        this.lteamState.players.forEach( player => {
+        this.lteamState.players.forEach(player => {
             const playerObj = new Player(this, player.name, player.x, player.y, "L", this.lteamState.player_sprite_choice, true);
             this.lteamPlayers.add(playerObj);
         });
@@ -437,11 +437,11 @@ export class Game extends Phaser.Scene {
         this.rteamFlags = this.add.group();
         this.rteamPlayers = this.add.group();
 
-        this.rteamState.flags.forEach( flag => {
+        this.rteamState.flags.forEach(flag => {
             const flagObj = new Flag(this, flag.x, flag.y, "R", true);
             this.rteamFlags.add(flagObj);
         });
-        this.rteamState.players.forEach( player => {
+        this.rteamState.players.forEach(player => {
             const playerObj = new Player(this, player.name, player.x, player.y, "R", this.rteamState.player_sprite_choice, false);
             this.rteamPlayers.add(playerObj);
         });
@@ -466,9 +466,9 @@ export class Game extends Phaser.Scene {
     initInput() {
         this.cursors = this.input.keyboard.createCursorKeys();
         this.awsd_keys = this.input.keyboard.addKeys({
-            up:    Phaser.Input.Keyboard.KeyCodes.W,
-            left:  Phaser.Input.Keyboard.KeyCodes.A,
-            down:  Phaser.Input.Keyboard.KeyCodes.S,
+            up: Phaser.Input.Keyboard.KeyCodes.W,
+            left: Phaser.Input.Keyboard.KeyCodes.A,
+            down: Phaser.Input.Keyboard.KeyCodes.S,
             right: Phaser.Input.Keyboard.KeyCodes.D
         });
 
@@ -478,7 +478,7 @@ export class Game extends Phaser.Scene {
         // });
 
         this.cursors.space.on('down', (key, event) => {
-             this.startOrPauseOrContinue();
+            this.startOrPauseOrContinue();
         });
     }
 
@@ -567,9 +567,9 @@ export class Game extends Phaser.Scene {
         const mapPayload = {
             "width": this.mapWidth,
             "height": this.mapHeight,
-            "walls": this.walls.map(w => {return {x: w.x, y: w.y}}),
+            "walls": this.walls.map(w => { return { x: w.x, y: w.y } }),
             "obstacles": this.obstacles1.concat(this.obstacles2).concat(
-              this.obstacles2.map(w => {return {"x": w.x, "y": w.y + 1}})
+                this.obstacles2.map(w => { return { "x": w.x, "y": w.y + 1 } })
             ),
         };
 
@@ -660,7 +660,7 @@ export class Game extends Phaser.Scene {
                 }
             }
             if (isAvailable) {
-                return {x: prisons[i].x, y: prisons[i].y};
+                return { x: prisons[i].x, y: prisons[i].y };
             }
         }
     }
@@ -697,7 +697,7 @@ export class Game extends Phaser.Scene {
                 }
             }
             if (isAvailable) {
-                return {x: targets[i].x, y: targets[i].y};
+                return { x: targets[i].x, y: targets[i].y };
             }
         }
     }
@@ -736,11 +736,11 @@ export class Game extends Phaser.Scene {
             return;
         }
         if (player.team == "L") {
-            this.lteamPlayers.getChildren().forEach( player => {
+            this.lteamPlayers.getChildren().forEach(player => {
                 if (player.inPrison) { player.inPrison = false; }
             })
         } else {
-            this.rteamPlayers.getChildren().forEach( player => {
+            this.rteamPlayers.getChildren().forEach(player => {
                 if (player.inPrison) { player.inPrison = false; }
             })
         }
@@ -783,21 +783,21 @@ export class Game extends Phaser.Scene {
             this.tree1Tiles.indexOf(tile.index) >= 0 ||
             this.tree2Tiles[0].indexOf(tile.index) >= 0 ||
             this.tree2Tiles[1].indexOf(tile.index) >= 0
-        ;
+            ;
     }
 
     // return a 3x3 grid from x, y
     create3x3grid(x, y) {
         return [
-            {x: x - 1, y: y - 1}, {x: x, y: y - 1}, {x: x + 1, y: y - 1},
-            {x: x - 1, y: y},     {x: x, y: y},     {x: x + 1, y: y},
-            {x: x - 1, y: y + 1}, {x: x, y: y + 1}, {x: x + 1, y: y + 1},
+            { x: x - 1, y: y - 1 }, { x: x, y: y - 1 }, { x: x + 1, y: y - 1 },
+            { x: x - 1, y: y }, { x: x, y: y }, { x: x + 1, y: y },
+            { x: x - 1, y: y + 1 }, { x: x, y: y + 1 }, { x: x + 1, y: y + 1 },
         ]
     }
 
     GameOver(team) {
         this.gameStarted = false;
-        this.gameOverText.setText(team+"Team Won!")
+        this.gameOverText.setText(team + "Team Won!")
         this.gameOverText.setVisible(true);
 
         if (this.lteamSocket && this.lteamSocket.readyState == WebSocket.OPEN) {
