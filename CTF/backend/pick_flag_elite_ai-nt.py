@@ -11,20 +11,26 @@ class EliteCTFAI_NT(EliteCTFAI):
     def __init__(self, show_gap_in_msec=1000.0):
         super().__init__(show_gap_in_msec=show_gap_in_msec)
         self.lure_enabled = True
+        self.lure_min_runners = 4
         self.lure_min_flag_depth = 2
         self.lure_stage_depth = 3
         self.better_lure_time_buffer = 1
 
         self.guard_enabled = True
-        self.guard_min_runners = 3
+        self.guard_min_runners = 4
         self.defense_chase_buffer = 1
         self.defense_block_buffer = 0
 
         self.prison_ready_enabled = True
         self.escape_impossible_buffer = 1
+        self.doomed_entry_slack = 1
 
         self.bait_enabled = True
         self.bait_min_enemy_dist = 3
+
+        self.endgame_defense_enabled = True
+        self.endgame_flags_left = 3
+        self.endgame_min_attackers = 1
 
         self._doomed_this_tick = set()
 
@@ -69,6 +75,38 @@ class EliteCTFAI_NT(EliteCTFAI):
 
     def _boundary_entries(self):
         return [(self.our_boundary_x, y) for y in (self.boundary_ys or [])]
+
+    def _best_boundary_entry_path(self, start, opponents):
+        if not self.boundary_ys:
+            return None, None
+
+        enemy_positions = [self._pos(o) for o in opponents if not self._is_safe(self._pos(o))]
+        avoid0 = self._expanded_enemy_obstacles(opponents, 0)
+
+        candidates = []
+        for y in self.boundary_ys:
+            entry = (self.our_boundary_x, y)
+            path = self._route(start, entry, extra_obstacles=avoid0, restrict_safe=False)
+            if not path:
+                path = self._route(start, entry, restrict_safe=False)
+            if not path:
+                continue
+
+            steps = len(path) - 1
+            enemy_dist = self._min_steps_from_any(enemy_positions, entry, restrict_safe=False)
+            if enemy_dist is None:
+                enemy_dist = 10**6
+            candidates.append((steps, -enemy_dist, entry, path))
+
+        if not candidates:
+            return None, None
+
+        min_steps = min(item[0] for item in candidates)
+        slack = max(0, int(self.doomed_entry_slack))
+        shortlist = [item for item in candidates if item[0] <= min_steps + slack]
+        shortlist.sort(key=lambda item: (item[0], item[1]))
+        _steps, _neg_enemy_dist, entry, path = shortlist[0]
+        return entry, path
 
     def _escape_almost_impossible(self, start, opponents):
         if self._is_safe(start):
@@ -184,6 +222,63 @@ class EliteCTFAI_NT(EliteCTFAI):
         reserved.add(runner["name"])
         return actions, reserved
 
+    def _plan_defend_my_flags(self, runners, my_flags, opponents_free, enemy_flags, *, my_score, opponent_score):
+        actions = {}
+        reserved = set()
+
+        if not self.endgame_defense_enabled:
+            return actions, reserved
+        if not runners or not my_flags:
+            return actions, reserved
+        if len(my_flags) > self.endgame_flags_left:
+            return actions, reserved
+
+        min_attackers = int(self.endgame_min_attackers)
+        if my_score < opponent_score and len(runners) >= 3:
+            min_attackers = max(min_attackers, 2)
+        if not enemy_flags:
+            min_attackers = 0
+
+        defenders_budget = max(0, len(runners) - min_attackers)
+        if defenders_budget <= 0:
+            return actions, reserved
+
+        flag_positions = [self._flag_pos(f) for f in my_flags]
+        opponents_on_our_side = [self._pos(o) for o in opponents_free if self._is_safe(self._pos(o))]
+
+        def threat_steps(flag_pos):
+            steps = self._min_steps_from_any(opponents_on_our_side, flag_pos, restrict_safe=True)
+            return steps if steps is not None else 10**6
+
+        flag_positions.sort(key=threat_steps)
+
+        available = list(runners)
+        for flag_pos in flag_positions:
+            if defenders_budget <= 0 or not available:
+                break
+
+            best_runner = None
+            best_path = None
+            for p in available:
+                path = self._route(self._pos(p), flag_pos, restrict_safe=True)
+                if not path:
+                    continue
+                if best_path is None or len(path) < len(best_path):
+                    best_path = path
+                    best_runner = p
+
+            if best_runner is None or best_path is None:
+                continue
+
+            move = self._next_move(self._pos(best_runner), best_path)
+            if move:
+                actions[best_runner["name"]] = move
+            reserved.add(best_runner["name"])
+            available = [p for p in available if p["name"] != best_runner["name"]]
+            defenders_budget -= 1
+
+        return actions, reserved
+
     def _move_carrier(self, player, opponents, targets):
         start = self._pos(player)
 
@@ -194,13 +289,7 @@ class EliteCTFAI_NT(EliteCTFAI):
         doomed = self._escape_almost_impossible(start, opponents)
         if doomed:
             self._doomed_this_tick.add(player["name"])
-            avoid0 = self._expanded_enemy_obstacles(opponents, 0)
-            path = self._route_any(start, self._boundary_entries(), extra_obstacles=avoid0, restrict_safe=False)
-            move = self._next_move(start, path)
-            if move:
-                return move
-
-            path = self._route_any(start, self._boundary_entries(), restrict_safe=False)
+            _entry, path = self._best_boundary_entry_path(start, opponents)
             move = self._next_move(start, path)
             if move:
                 return move
@@ -346,21 +435,6 @@ class EliteCTFAI_NT(EliteCTFAI):
                     chase_path = path
                     chaser = p
 
-            if chaser is None or chase_path is None:
-                continue
-
-            chase_steps = len(chase_path) - 1
-            need_blocker = chase_steps + self.defense_chase_buffer > escape_dist
-
-            move = self._next_move(self._pos(chaser), chase_path)
-            if move:
-                actions[chaser["name"]] = move
-            reserved.add(chaser["name"])
-            available = [p for p in available if p["name"] != chaser["name"]]
-
-            if not need_blocker or not available:
-                continue
-
             blocker = None
             blocker_path = None
             for p in available:
@@ -369,26 +443,67 @@ class EliteCTFAI_NT(EliteCTFAI):
                     blocker_path = path
                     blocker = p
 
-            if blocker is None or blocker_path is None:
+            chase_steps = (len(chase_path) - 1) if chase_path else None
+            block_steps = (len(blocker_path) - 1) if blocker_path else None
+
+            chase_margin = None
+            if chase_steps is not None and escape_dist is not None:
+                chase_margin = (chase_steps + self.defense_chase_buffer) - escape_dist
+
+            block_margin = None
+            if block_steps is not None and escape_dist is not None:
+                block_margin = block_steps - (escape_dist - self.defense_block_buffer)
+
+            primary = None
+            primary_path = None
+            secondary = None
+            secondary_path = None
+
+            if chase_margin is not None and chase_margin <= 0:
+                primary = chaser
+                primary_path = chase_path
+            elif block_margin is not None and block_margin <= 0:
+                primary = blocker
+                primary_path = blocker_path
+            else:
+                choice = []
+                if chase_margin is not None and chaser is not None and chase_path is not None:
+                    choice.append((chase_margin, chaser, chase_path, "chase"))
+                if block_margin is not None and blocker is not None and blocker_path is not None:
+                    choice.append((block_margin, blocker, blocker_path, "block"))
+                if not choice:
+                    continue
+                choice.sort(key=lambda item: item[0])
+                _margin, primary, primary_path, kind = choice[0]
+
+                if kind == "chase":
+                    secondary = blocker
+                    secondary_path = blocker_path
+                else:
+                    secondary = chaser
+                    secondary_path = chase_path
+
+            if primary is None or primary_path is None:
                 continue
 
-            block_steps = len(blocker_path) - 1
-            if block_steps > escape_dist - self.defense_block_buffer:
-                continue
-
-            move = self._next_move(self._pos(blocker), blocker_path)
+            move = self._next_move(self._pos(primary), primary_path)
             if move:
-                actions[blocker["name"]] = move
-            reserved.add(blocker["name"])
-            available = [p for p in available if p["name"] != blocker["name"]]
+                actions[primary["name"]] = move
+            reserved.add(primary["name"])
+            available = [p for p in available if p["name"] != primary["name"]]
 
-        if self.guard_post is not None and available and len(runners) >= 4:
-            backstop, path = self._closest_runner_to_cell(available, self.guard_post)
-            if backstop is not None:
-                move = self._next_move(self._pos(backstop), path)
-                if move:
-                    actions[backstop["name"]] = move
-                reserved.add(backstop["name"])
+            urgent = escape_dist is not None and escape_dist <= 2
+            allow_double_team = urgent or len(runners) >= 4
+            if not allow_double_team or not available or secondary is None or secondary_path is None:
+                continue
+            if secondary["name"] not in {p["name"] for p in available}:
+                continue
+
+            move = self._next_move(self._pos(secondary), secondary_path)
+            if move:
+                actions[secondary["name"]] = move
+            reserved.add(secondary["name"])
+            available = [p for p in available if p["name"] != secondary["name"]]
 
         return actions, reserved
 
@@ -562,9 +677,9 @@ class EliteCTFAI_NT(EliteCTFAI):
                 if not p.get("hasFlag"):
                     continue
                 p_pos = self._pos(p)
-                path = self._route_any(p_pos, self._boundary_entries(), restrict_safe=False)
-                if path:
-                    avoid_lane_y = path[-1][1]
+                entry, _path = self._best_boundary_entry_path(p_pos, opponents_free)
+                if entry:
+                    avoid_lane_y = entry[1]
                     break
 
         need_prison_ready = bool(my_prisoners) or bool(doomed_names)
@@ -578,7 +693,7 @@ class EliteCTFAI_NT(EliteCTFAI):
         defended_intruders = False
         if not intruder_carriers and intruders and runners:
             allow_lure = False
-            if len(runners) >= 3 and self._lure_is_reasonable(req, my_flags):
+            if len(runners) >= self.lure_min_runners and self._lure_is_reasonable(req, my_flags):
                 allow_lure = True
                 if BETTER_LURE and not self._better_lure_is_winning(runners, intruders, my_flags):
                     allow_lure = False
@@ -601,23 +716,73 @@ class EliteCTFAI_NT(EliteCTFAI):
             reserved |= bait_reserved
             runners = [p for p in runners if p["name"] not in reserved]
 
-        threat_present = bool(intruder_carriers) or (defended_intruders and my_score >= opponent_score)
+        if runners and my_flags:
+            defense_actions, defense_reserved = self._plan_defend_my_flags(
+                runners,
+                my_flags,
+                opponents_free,
+                enemy_flags,
+                my_score=my_score,
+                opponent_score=opponent_score,
+            )
+            actions.update(defense_actions)
+            reserved |= defense_reserved
+            runners = [p for p in runners if p["name"] not in reserved]
+
+        intruder_pressure = False
+        if intruder_carriers:
+            intruder_pressure = True
+        elif intruders and my_flags:
+            my_flag_positions = [self._flag_pos(f) for f in my_flags]
+            for o in intruders:
+                dist = self._min_steps_any(self._pos(o), my_flag_positions, restrict_safe=True)
+                if dist is not None and dist <= 4:
+                    intruder_pressure = True
+                    break
+
+        threat_present = intruder_pressure or (defended_intruders and my_score > opponent_score)
         if (
             self.guard_enabled
             and threat_present
-            and self.guard_post is not None
             and runners
             and len(runners) >= self.guard_min_runners
         ):
             safe_runners = [p for p in runners if self._is_safe(self._pos(p))]
             if safe_runners:
-                best_guard, path = self._closest_runner_to_cell(safe_runners, self.guard_post)
-                if best_guard is not None:
-                    move = self._next_move(self._pos(best_guard), path)
-                    if move:
-                        actions[best_guard["name"]] = move
-                    reserved.add(best_guard["name"])
-                    runners = [p for p in runners if p["name"] != best_guard["name"]]
+                opponent_positions_our_side = [
+                    self._pos(o) for o in opponents_free if self._is_safe(self._pos(o))
+                ]
+                guard_target = None
+                if my_flags:
+                    flag_positions = [self._flag_pos(f) for f in my_flags]
+                    if opponent_positions_our_side:
+                        guard_target = min(
+                            flag_positions,
+                            key=lambda fpos: self._min_steps_from_any(
+                                opponent_positions_our_side, fpos, restrict_safe=True
+                            )
+                            or 10**6,
+                        )
+                    else:
+                        runner_positions = [self._pos(p) for p in safe_runners]
+                        guard_target = min(
+                            flag_positions,
+                            key=lambda fpos: self._min_steps_from_any(
+                                runner_positions, fpos, restrict_safe=True
+                            )
+                            or 10**6,
+                        )
+                if guard_target is None:
+                    guard_target = self.guard_post
+
+                if guard_target is not None:
+                    best_guard, path = self._closest_runner_to_cell(safe_runners, guard_target)
+                    if best_guard is not None:
+                        move = self._next_move(self._pos(best_guard), path)
+                        if move:
+                            actions[best_guard["name"]] = move
+                        reserved.add(best_guard["name"])
+                        runners = [p for p in runners if p["name"] != best_guard["name"]]
 
         attackers = [p for p in runners if p["name"] not in reserved]
         flag_positions = [self._flag_pos(f) for f in enemy_flags]
