@@ -453,10 +453,14 @@ class AggressiveCTFAI:
 
         if intruder_carriers and (ready or waiting):
             defenders = [p for p in (ready + waiting) if self._is_safe(self._pos(p))]
-            target_positions = [self._pos(o) for o in intruder_carriers]
-            assignments = self._assign_defense_targets(defenders, target_positions)
+            reserved = set()
+            block_targets = [
+                (self.our_boundary_x, self._closest_boundary_y(self._pos(o)[1]))
+                for o in intruder_carriers
+            ]
+            block_assignments = self._assign_defense_targets(defenders, block_targets)
             for p in defenders:
-                target = assignments.get(p["name"])
+                target = block_assignments.get(p["name"])
                 if not target:
                     continue
                 start = self._pos(p)
@@ -470,12 +474,37 @@ class AggressiveCTFAI:
                 )
                 if move:
                     actions[p["name"]] = move
+                reserved.add(p["name"])
+
+            chasers = [p for p in defenders if p["name"] not in reserved]
+            if chasers:
+                chase_targets = [self._pos(o) for o in intruder_carriers]
+                chase_assignments = self._assign_defense_targets(chasers, chase_targets)
+                for p in chasers:
+                    target = chase_assignments.get(p["name"])
+                    if not target:
+                        continue
+                    start = self._pos(p)
+                    move = self._move_towards(
+                        start,
+                        target,
+                        opponents=intruders,
+                        avoid_radius=1,
+                        restrict_safe=True,
+                        lane_y=target[1],
+                    )
+                    if move:
+                        actions[p["name"]] = move
         elif intruders and ready:
             defenders = [p for p in ready if self._is_safe(self._pos(p))]
-            target_positions = [self._pos(o) for o in intruders]
-            assignments = self._assign_defense_targets(defenders, target_positions)
+            reserved = set()
+            block_targets = [
+                (self.our_boundary_x, self._closest_boundary_y(self._pos(o)[1]))
+                for o in intruders
+            ]
+            block_assignments = self._assign_defense_targets(defenders, block_targets)
             for p in defenders:
-                target = assignments.get(p["name"])
+                target = block_assignments.get(p["name"])
                 if not target:
                     continue
                 start = self._pos(p)
@@ -489,6 +518,27 @@ class AggressiveCTFAI:
                 )
                 if move:
                     actions[p["name"]] = move
+                reserved.add(p["name"])
+
+            chasers = [p for p in defenders if p["name"] not in reserved]
+            if chasers:
+                chase_targets = [self._pos(o) for o in intruders]
+                chase_assignments = self._assign_defense_targets(chasers, chase_targets)
+                for p in chasers:
+                    target = chase_assignments.get(p["name"])
+                    if not target:
+                        continue
+                    start = self._pos(p)
+                    move = self._move_towards(
+                        start,
+                        target,
+                        opponents=intruders,
+                        avoid_radius=1,
+                        restrict_safe=True,
+                        lane_y=target[1],
+                    )
+                    if move:
+                        actions[p["name"]] = move
         elif boundary_threats and ready:
             defenders = [p for p in ready if self._is_safe(self._pos(p))]
             block_positions = [
