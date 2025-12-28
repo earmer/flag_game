@@ -21,8 +21,10 @@ class AggressiveCTFAI:
         self.lane_assignment = {}
         self.flag_assignment = {}
         self.phase = "attack"
+        self.attack_stage = "staging"
         self.tick = 0
         self.num_flags = 0
+        self.stall_score_threshold = 0
 
         self.flag_switch_penalty = 3.0
         self.lane_switch_penalty = 1.5
@@ -37,10 +39,12 @@ class AggressiveCTFAI:
         self.world.init(req)
         self.tick = 0
         self.phase = "attack"
+        self.attack_stage = "staging"
         self.flag_assignment = {}
         self.lane_assignment = {}
         self.lane_ys = []
         self.num_flags = req.get("numFlags", 0)
+        self.stall_score_threshold = max(0, self.num_flags - 2)
         self._init_geometry()
         side = "Left" if self.my_side_is_left else "Right"
         print(f"Aggressive AI started. Side: {side}")
@@ -270,6 +274,13 @@ class AggressiveCTFAI:
 
         return best_assignment
 
+    def _lane_entry_for_player(self, player):
+        lane_y = self.lane_assignment.get(player["name"])
+        if lane_y is None:
+            lane_y = self._closest_boundary_y(player["posY"])
+            self.lane_assignment[player["name"]] = lane_y
+        return (self.our_boundary_x, lane_y)
+
     def _should_rescue(self, prisoners, free_players):
         if not prisoners or not free_players:
             return False
@@ -279,12 +290,16 @@ class AggressiveCTFAI:
             return False
         return True
 
-    def _should_stall(self, my_score, opponent_score, enemy_flags, free_players):
+    def _should_stall(self, my_score, opponent_score, enemy_flags, free_players, opponents_free):
         if not enemy_flags or not free_players:
             return False
-        if my_score <= opponent_score:
+        if my_score < self.stall_score_threshold:
+            return False
+        if opponent_score >= self.stall_score_threshold:
             return False
         if len(enemy_flags) > len(free_players):
+            return False
+        if any(o.get("hasFlag") for o in opponents_free):
             return False
         return True
 
@@ -375,6 +390,60 @@ class AggressiveCTFAI:
             return min(targets, key=lambda t: self._manhattan(start, t))
         return min(targets, key=lambda t: (abs(t[1] - lane_y), self._manhattan(start, t)))
 
+    def _staging_actions(self, free_players, opponents_free, prisoners):
+        self._assign_lanes_to_players(free_players)
+        ready = []
+        waiting = []
+        actions = {}
+
+        for p in free_players:
+            start = self._pos(p)
+            entry = self._lane_entry_for_player(p)
+            if self._is_safe(start) and start == entry:
+                ready.append(p)
+            else:
+                waiting.append(p)
+
+        all_ready = not prisoners and not waiting
+        if all_ready:
+            return actions, True
+
+        intruders = [o for o in opponents_free if self._is_safe(self._pos(o))]
+        intruder_targets = [o for o in intruders if o.get("hasFlag")] or intruders
+
+        for p in waiting:
+            start = self._pos(p)
+            entry = self._lane_entry_for_player(p)
+            restrict_safe = self._is_safe(start)
+            opponents = intruders if restrict_safe else opponents_free
+            move = self._move_towards(
+                start,
+                entry,
+                opponents=opponents,
+                avoid_radius=1,
+                restrict_safe=restrict_safe,
+                lane_y=entry[1],
+            )
+            if move:
+                actions[p["name"]] = move
+
+        if intruder_targets and ready:
+            for p in ready:
+                start = self._pos(p)
+                target = min(intruder_targets, key=lambda o: self._manhattan(start, self._pos(o)))
+                move = self._move_towards(
+                    start,
+                    self._pos(target),
+                    opponents=intruders,
+                    avoid_radius=1,
+                    restrict_safe=True,
+                    lane_y=int(round(target["posY"])),
+                )
+                if move:
+                    actions[p["name"]] = move
+
+        return actions, False
+
     def _stall_moves(self, free_players, enemy_flags, opponents):
         self._assign_lanes_to_players(free_players)
         flag_positions = [(int(f["posX"]), int(f["posY"])) for f in enemy_flags]
@@ -441,19 +510,36 @@ class AggressiveCTFAI:
         my_score = req.get("myteamScore", 0)
         opponent_score = req.get("opponentScore", 0)
 
-        if self._should_stall(my_score, opponent_score, enemy_flags, my_free):
+        if self._should_stall(my_score, opponent_score, enemy_flags, my_free, opponents_free):
             self.phase = "stall"
             return self._stall_moves(my_free, enemy_flags, opponents_free)
 
         if self.phase != "rescue" and self._should_rescue(my_prisoners, my_free):
             self.phase = "rescue"
+            self.attack_stage = "staging"
         elif self.phase == "rescue" and not my_prisoners:
             self.phase = "attack"
+            self.attack_stage = "staging"
 
         if self.phase == "rescue":
             return self._rescue_moves(my_free, prisons, opponents_free)
 
         self.phase = "attack"
+
+        carriers = [p for p in my_free if p.get("hasFlag")]
+        all_safe_no_flag = all(
+            self._is_safe(self._pos(p)) and not p.get("hasFlag") for p in my_free
+        )
+        if not carriers and all_safe_no_flag and self.attack_stage == "go":
+            self.attack_stage = "staging"
+            self.flag_assignment = {}
+
+        if not carriers and self.attack_stage == "staging":
+            actions, all_ready = self._staging_actions(my_free, opponents_free, my_prisoners)
+            if not all_ready:
+                return actions
+            self.attack_stage = "go"
+
         self._assign_lanes_to_players(my_free)
 
         opponents_safe_side = [o for o in opponents_free if self._is_safe(self._pos(o))]
@@ -462,7 +548,6 @@ class AggressiveCTFAI:
 
         actions = {}
 
-        carriers = [p for p in my_free if p.get("hasFlag")]
         runners = [p for p in my_free if not p.get("hasFlag")]
 
         for p in carriers:
