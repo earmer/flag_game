@@ -4,6 +4,7 @@ import json
 import logging
 import random
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -87,6 +88,11 @@ def _clone_state_dict_cpu(model: torch.nn.Module) -> dict[str, torch.Tensor]:
         if isinstance(value, torch.Tensor):
             state[key] = value.detach().to("cpu").clone()
     return state
+
+
+def _step_env(args: tuple[CTFGameEngineSelfPlayEnv, list[int], list[int]]) -> tuple[dict, dict, bool]:
+    env, actions_L, actions_R = args
+    return env.step(actions_L, actions_R)
 
 
 class HistoricalOpponentPool:
@@ -320,7 +326,19 @@ def main() -> None:
     torch.manual_seed(seed)
 
     device = select_device()
-    env = CTFGameEngineSelfPlayEnv(env_cfg)
+    num_envs = int(training_cfg.get("num_envs", 1))
+    sim_threads = int(training_cfg.get("sim_threads", max(1, num_envs)))
+    sim_threads = max(1, sim_threads)
+
+    def _env_cfg_for_index(idx: int) -> dict:
+        cfg = dict(env_cfg)
+        seed = cfg.get("seed", None)
+        if seed is not None:
+            cfg["seed"] = int(seed) + idx
+        return cfg
+
+    envs = [CTFGameEngineSelfPlayEnv(_env_cfg_for_index(idx)) for idx in range(num_envs)]
+    env = envs[0]
 
     LOGGER.info(
         "Launcher config: engine=MockEnvVNew env=%sx%s players=%s depth=%s history=%s seed=%s init_path=%s",
@@ -333,27 +351,36 @@ def main() -> None:
         env_cfg.get("init_path"),
     )
 
-    encoder_L = TeamHistoryStateEncoder(
-        width=env.width,
-        height=env.height,
-        max_players=env.num_players,
-        history_len=int(model_cfg.get("history_len", 3)),
-        normalize_side=bool(model_cfg.get("normalize_side", True)),
-    )
-    encoder_R = TeamHistoryStateEncoder(
-        width=env.width,
-        height=env.height,
-        max_players=env.num_players,
-        history_len=int(model_cfg.get("history_len", 3)),
-        normalize_side=bool(model_cfg.get("normalize_side", True)),
-    )
-    encoder_L.start_game(env.init_req["L"])
-    encoder_R.start_game(env.init_req["R"])
+    encoder_L = []
+    encoder_R = []
+    tracker_L = []
+    tracker_R = []
+    for env_item in envs:
+        enc_L = TeamHistoryStateEncoder(
+            width=env_item.width,
+            height=env_item.height,
+            max_players=env_item.num_players,
+            history_len=int(model_cfg.get("history_len", 3)),
+            normalize_side=bool(model_cfg.get("normalize_side", True)),
+        )
+        enc_R = TeamHistoryStateEncoder(
+            width=env_item.width,
+            height=env_item.height,
+            max_players=env_item.num_players,
+            history_len=int(model_cfg.get("history_len", 3)),
+            normalize_side=bool(model_cfg.get("normalize_side", True)),
+        )
+        enc_L.start_game(env_item.init_req["L"])
+        enc_R.start_game(env_item.init_req["R"])
+        encoder_L.append(enc_L)
+        encoder_R.append(enc_R)
 
-    tracker_L = RewardTracker(max_players=env.num_players)
-    tracker_R = RewardTracker(max_players=env.num_players)
-    tracker_L.start_game(env.init_req["L"])
-    tracker_R.start_game(env.init_req["R"])
+        tr_L = RewardTracker(max_players=env_item.num_players)
+        tr_R = RewardTracker(max_players=env_item.num_players)
+        tr_L.start_game(env_item.init_req["L"])
+        tr_R.start_game(env_item.init_req["R"])
+        tracker_L.append(tr_L)
+        tracker_R.append(tr_R)
 
     in_channels = int(model_cfg.get("history_len", 3)) * 12
     model = TreePPOPolicy(
@@ -361,12 +388,15 @@ def main() -> None:
         feature_dim=int(model_cfg.get("feature_dim", 128)),
         depth=int(model_cfg.get("depth", 10)),
     ).to(device)
-    opponent_model = TreePPOPolicy(
-        in_channels=in_channels,
-        feature_dim=int(model_cfg.get("feature_dim", 128)),
-        depth=int(model_cfg.get("depth", 10)),
-    ).to(device)
-    opponent_model.eval()
+    opponent_models = []
+    for _ in range(num_envs):
+        opp = TreePPOPolicy(
+            in_channels=in_channels,
+            feature_dim=int(model_cfg.get("feature_dim", 128)),
+            depth=int(model_cfg.get("depth", 10)),
+        ).to(device)
+        opp.eval()
+        opponent_models.append(opp)
     optimizer = torch.optim.Adam(model.parameters(), lr=float(ppo_cfg.get("learning_rate", 3e-4)))
 
     ckpt_path = Path(__file__).resolve().parent / str(config.get("checkpoint_path", "checkpoints/latest.pt"))
@@ -405,20 +435,21 @@ def main() -> None:
     eval_episodes = int(eval_cfg.get("episodes", 20))
 
     print(f"[TreePPO] training on device: {device}")
-    LOGGER.info("Beginning training on device=%s (epsilon=%s)", device, epsilon)
+    LOGGER.info(
+        "Beginning training on device=%s (epsilon=%s, num_envs=%d, sim_threads=%d)",
+        device,
+        epsilon,
+        num_envs,
+        sim_threads,
+    )
 
     update_idx = 0
-    obs_L, obs_R = env.reset()
-    tracker_L.reset_episode(obs_L)
-    tracker_R.reset_episode(obs_R)
-    encoder_L.reset_history()
-    encoder_R.reset_history()
+    obs_L = []
+    obs_R = []
+    use_hist_opponent_R = []
 
-    use_hist_opponent_R = False
-
-    def select_opponent_for_episode() -> None:
-        nonlocal use_hist_opponent_R
-        use_hist_opponent_R = False
+    def select_opponent_for_episode(idx: int) -> None:
+        use_hist_opponent_R[idx] = False
         if len(hist_pool) < hist_min_pool:
             return
         if rng.random() >= hist_prob:
@@ -426,14 +457,23 @@ def main() -> None:
         snapshot = hist_pool.sample(rng, exclude_latest=True)
         if snapshot is None:
             return
-        opponent_model.load_state_dict(snapshot)
-        use_hist_opponent_R = True
+        opponent_models[idx].load_state_dict(snapshot)
+        use_hist_opponent_R[idx] = True
 
-    select_opponent_for_episode()
+    for idx, env_item in enumerate(envs):
+        obs_L_i, obs_R_i = env_item.reset()
+        obs_L.append(obs_L_i)
+        obs_R.append(obs_R_i)
+        tracker_L[idx].reset_episode(obs_L_i)
+        tracker_R[idx].reset_episode(obs_R_i)
+        encoder_L[idx].reset_history()
+        encoder_R[idx].reset_history()
+        use_hist_opponent_R.append(False)
+        select_opponent_for_episode(idx)
 
     while True:
         model.train()
-        rollout = Rollout()
+        rollouts = [Rollout() for _ in range(num_envs)]
         update_reward_L = 0.0
         update_reward_R = 0.0
         LOGGER.info(
@@ -443,99 +483,134 @@ def main() -> None:
             epsilon,
         )
         LOGGER.info(
-            "Opponent mix: hist_prob=%.2f pool=%d min_pool=%d (current_ep_R=%s)",
+            "Opponent mix: hist_prob=%.2f pool=%d min_pool=%d (num_envs=%d)",
             hist_prob,
             len(hist_pool),
             hist_min_pool,
-            "historical" if use_hist_opponent_R else "self",
+            num_envs,
         )
 
-        for step_idx in range(rollout_steps):
-            obs_L_batch, players_L, active_L = encoder_L.encode_team(obs_L)
-            obs_R_batch, players_R, active_R = encoder_R.encode_team(obs_R)
-            if obs_L_batch.size == 0 or obs_R_batch.size == 0:
-                break
+        with ThreadPoolExecutor(max_workers=sim_threads) as executor:
+            for step_idx in range(rollout_steps):
+                step_args = []
+                per_env_cache = []
+                for env_idx, env_item in enumerate(envs):
+                    obs_L_batch, _players_L, active_L = encoder_L[env_idx].encode_team(obs_L[env_idx])
+                    obs_R_batch, _players_R, active_R = encoder_R[env_idx].encode_team(obs_R[env_idx])
+                    if obs_L_batch.size == 0 or obs_R_batch.size == 0:
+                        continue
 
-            actions_ai_L, logp_L, v_L = sample_actions(
-                model, obs_L_batch, active_L, device=device, epsilon=epsilon, rng=rng
-            )
-            if use_hist_opponent_R:
-                actions_ai_R, _logp_R_opp, _v_R_opp = sample_actions(
-                    opponent_model,
-                    obs_R_batch,
-                    active_R,
-                    device=device,
-                    epsilon=hist_opponent_epsilon,
-                    rng=rng,
-                )
-                logp_R = np.zeros_like(actions_ai_R, dtype=np.float32)
-                v_R = np.zeros_like(actions_ai_R, dtype=np.float32)
-                active_R_train = np.zeros_like(active_R, dtype=np.float32)
-            else:
-                actions_ai_R, logp_R, v_R = sample_actions(
-                    model, obs_R_batch, active_R, device=device, epsilon=epsilon, rng=rng
-                )
-                active_R_train = active_R
+                    actions_ai_L, logp_L, v_L = sample_actions(
+                        model, obs_L_batch, active_L, device=device, epsilon=epsilon, rng=rng
+                    )
+                    if use_hist_opponent_R[env_idx]:
+                        actions_ai_R, _logp_R_opp, _v_R_opp = sample_actions(
+                            opponent_models[env_idx],
+                            obs_R_batch,
+                            active_R,
+                            device=device,
+                            epsilon=hist_opponent_epsilon,
+                            rng=rng,
+                        )
+                        logp_R = np.zeros_like(actions_ai_R, dtype=np.float32)
+                        v_R = np.zeros_like(actions_ai_R, dtype=np.float32)
+                        active_R_train = np.zeros_like(active_R, dtype=np.float32)
+                    else:
+                        actions_ai_R, logp_R, v_R = sample_actions(
+                            model, obs_R_batch, active_R, device=device, epsilon=epsilon, rng=rng
+                        )
+                        active_R_train = active_R
 
-            actions_env_L = ai_actions_to_env(actions_ai_L, encoder=encoder_L)
-            actions_env_R = ai_actions_to_env(actions_ai_R, encoder=encoder_R)
+                    actions_env_L = ai_actions_to_env(actions_ai_L, encoder=encoder_L[env_idx])
+                    actions_env_R = ai_actions_to_env(actions_ai_R, encoder=encoder_R[env_idx])
+                    step_args.append((env_item, actions_env_L, actions_env_R))
+                    per_env_cache.append(
+                        (
+                            env_idx,
+                            obs_L_batch,
+                            obs_R_batch,
+                            actions_ai_L,
+                            actions_ai_R,
+                            logp_L,
+                            logp_R,
+                            v_L,
+                            v_R,
+                            active_L,
+                            active_R_train,
+                            actions_env_L,
+                            actions_env_R,
+                        )
+                    )
 
-            next_obs_L, next_obs_R, done = env.step(actions_env_L, actions_env_R)
+                if not step_args:
+                    break
 
-            reward_L = tracker_L.compute(obs_L, next_obs_L, done=done, actions_env=actions_env_L)
-            reward_R = tracker_R.compute(obs_R, next_obs_R, done=done, actions_env=actions_env_R)
-            update_reward_L += reward_L
-            update_reward_R += reward_R
+                step_results = list(executor.map(_step_env, step_args))
+                for (env_idx, obs_L_batch, obs_R_batch, actions_ai_L, actions_ai_R, logp_L, logp_R, v_L, v_R,
+                     active_L, active_R_train, actions_env_L, actions_env_R), (next_obs_L, next_obs_R, done) in zip(
+                    per_env_cache, step_results
+                ):
+                    reward_L = tracker_L[env_idx].compute(
+                        obs_L[env_idx], next_obs_L, done=done, actions_env=actions_env_L
+                    )
+                    reward_R = tracker_R[env_idx].compute(
+                        obs_R[env_idx], next_obs_R, done=done, actions_env=actions_env_R
+                    )
+                    update_reward_L += reward_L
+                    update_reward_R += reward_R
 
-            if reward_div > 0:
-                reward_L = reward_L / reward_div
-                reward_R_scaled = reward_R / reward_div
-            else:
-                reward_R_scaled = reward_R
+                    if reward_div > 0:
+                        reward_L = reward_L / reward_div
+                        reward_R_scaled = reward_R / reward_div
+                    else:
+                        reward_R_scaled = reward_R
 
-            n = env.num_players
-            obs_all = np.concatenate([obs_L_batch, obs_R_batch], axis=0)
-            actions_all = np.concatenate([actions_ai_L, actions_ai_R], axis=0)
-            logp_all = np.concatenate([logp_L, logp_R], axis=0)
-            v_all = np.concatenate([v_L, v_R], axis=0)
-            active_all = np.concatenate([active_L, active_R_train], axis=0)
-            rewards_all = np.concatenate(
-                [
-                    np.full((n,), reward_L, dtype=np.float32),
-                    np.full((n,), (reward_R_scaled if not use_hist_opponent_R else 0.0), dtype=np.float32),
-                ],
-                axis=0,
-            )
+                    n = envs[env_idx].num_players
+                    obs_all = np.concatenate([obs_L_batch, obs_R_batch], axis=0)
+                    actions_all = np.concatenate([actions_ai_L, actions_ai_R], axis=0)
+                    logp_all = np.concatenate([logp_L, logp_R], axis=0)
+                    v_all = np.concatenate([v_L, v_R], axis=0)
+                    active_all = np.concatenate([active_L, active_R_train], axis=0)
+                    rewards_all = np.concatenate(
+                        [
+                            np.full((n,), reward_L, dtype=np.float32),
+                            np.full(
+                                (n,),
+                                (reward_R_scaled if not use_hist_opponent_R[env_idx] else 0.0),
+                                dtype=np.float32,
+                            ),
+                        ],
+                        axis=0,
+                    )
 
-            rollout.add(
-                obs=obs_all.astype(np.float32, copy=False),
-                actions=actions_all.astype(np.int64, copy=False),
-                logprobs=logp_all.astype(np.float32, copy=False),
-                values=v_all.astype(np.float32, copy=False),
-                rewards=rewards_all,
-                active_masks=active_all.astype(np.float32, copy=False),
-                done=done,
-            )
+                    rollouts[env_idx].add(
+                        obs=obs_all.astype(np.float32, copy=False),
+                        actions=actions_all.astype(np.int64, copy=False),
+                        logprobs=logp_all.astype(np.float32, copy=False),
+                        values=v_all.astype(np.float32, copy=False),
+                        rewards=rewards_all,
+                        active_masks=active_all.astype(np.float32, copy=False),
+                        done=done,
+                    )
 
-            obs_L, obs_R = next_obs_L, next_obs_R
+                    obs_L[env_idx], obs_R[env_idx] = next_obs_L, next_obs_R
 
-            if done:
-                LOGGER.info(
-                    "Episode done at step %d (env time=%.1f) score L=%d R=%d",
-                    step_idx + 1,
-                    env.time,
-                    env.score["L"],
-                    env.score["R"],
-                )
-                obs_L, obs_R = env.reset()
-                tracker_L.reset_episode(obs_L)
-                tracker_R.reset_episode(obs_R)
-                encoder_L.reset_history()
-                encoder_R.reset_history()
-                select_opponent_for_episode()
-                LOGGER.info("New episode opponent(R)=%s (pool=%d)", "historical" if use_hist_opponent_R else "self", len(hist_pool))
+                    if done:
+                        LOGGER.info(
+                            "Episode done at step %d (env time=%.1f) score L=%d R=%d",
+                            step_idx + 1,
+                            envs[env_idx].time,
+                            envs[env_idx].score["L"],
+                            envs[env_idx].score["R"],
+                        )
+                        obs_L[env_idx], obs_R[env_idx] = envs[env_idx].reset()
+                        tracker_L[env_idx].reset_episode(obs_L[env_idx])
+                        tracker_R[env_idx].reset_episode(obs_R[env_idx])
+                        encoder_L[env_idx].reset_history()
+                        encoder_R[env_idx].reset_history()
+                        select_opponent_for_episode(env_idx)
 
-            render_progress(step_idx + 1, rollout_steps, prefix=f"update {update_idx + 1}")
+                render_progress(step_idx + 1, rollout_steps, prefix=f"update {update_idx + 1}")
         print()
 
         LOGGER.info(
@@ -544,8 +619,45 @@ def main() -> None:
             update_reward_L,
             update_reward_R,
         )
-        obs_arr, actions_arr, old_logp_arr, values_arr, rewards_arr, active_arr, dones_arr = rollout.as_arrays()
-        adv_arr, ret_arr = compute_gae(rewards_arr, values_arr, dones_arr, gamma=gamma, gae_lambda=gae_lambda)
+        obs_list = []
+        actions_list = []
+        old_logp_list = []
+        values_list = []
+        rewards_list = []
+        active_list = []
+        dones_list = []
+        adv_list = []
+        ret_list = []
+
+        for rollout in rollouts:
+            if not rollout.obs:
+                continue
+            obs_arr, actions_arr, old_logp_arr, values_arr, rewards_arr, active_arr, dones_arr = rollout.as_arrays()
+            adv_arr, ret_arr = compute_gae(rewards_arr, values_arr, dones_arr, gamma=gamma, gae_lambda=gae_lambda)
+            obs_list.append(obs_arr)
+            actions_list.append(actions_arr)
+            old_logp_list.append(old_logp_arr)
+            values_list.append(values_arr)
+            rewards_list.append(rewards_arr)
+            active_list.append(active_arr)
+            dones_list.append(dones_arr)
+            adv_list.append(adv_arr)
+            ret_list.append(ret_arr)
+
+        if not obs_list:
+            LOGGER.warning("No rollout data collected; skipping update %d", update_idx + 1)
+            continue
+
+        obs_arr = np.concatenate(obs_list, axis=0)
+        actions_arr = np.concatenate(actions_list, axis=0)
+        old_logp_arr = np.concatenate(old_logp_list, axis=0)
+        values_arr = np.concatenate(values_list, axis=0)
+        rewards_arr = np.concatenate(rewards_list, axis=0)
+        active_arr = np.concatenate(active_list, axis=0)
+        dones_arr = np.concatenate(dones_list, axis=0)
+        adv_arr = np.concatenate(adv_list, axis=0)
+        ret_arr = np.concatenate(ret_list, axis=0)
+
         active_for_norm = active_arr > 0.0
         if np.any(active_for_norm):
             mean = float(adv_arr[active_for_norm].mean())

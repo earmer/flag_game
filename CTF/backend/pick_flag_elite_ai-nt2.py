@@ -1,6 +1,7 @@
 import asyncio
 import importlib.machinery
 import importlib.util
+import itertools
 from pathlib import Path
 
 from lib.game_engine import run_game_server
@@ -44,7 +45,13 @@ class EliteCTFAI_NT2(EliteCTFAI_NT):
 
         self.carrier_chase_radius = 4
         self.carrier_chase_min_ticks = 30
+        self.carrier_chase_catch_slack = 0
         self._carrier_chase = {}
+
+        self.flag_boundary_pref_dist = 3
+        self.flag_boundary_pref_bonus = 1.5
+        self.flag_boundary_pref_dist_near = 1
+        self.flag_boundary_pref_bonus_near = 2.0
 
     def start_game(self, req):
         super().start_game(req)
@@ -273,6 +280,87 @@ class EliteCTFAI_NT2(EliteCTFAI_NT):
 
         return actions, reserved
 
+    def _assign_flags(self, attackers, flag_positions, opponents_enemy_side):
+        if not attackers or not flag_positions:
+            return {}
+
+        attackers = list(attackers)
+        flags = list(flag_positions)
+
+        if len(attackers) > len(flags):
+            scored = []
+            for p in attackers:
+                start = self._pos(p)
+                best = None
+                for fpos in flags:
+                    path = self._route(start, fpos, restrict_safe=False)
+                    if not path:
+                        continue
+                    dist = len(path) - 1
+                    if best is None or dist < best:
+                        best = dist
+                scored.append((best if best is not None else 10**9, p))
+            attackers = [p for _dist, p in sorted(scored, key=lambda item: item[0])[: len(flags)]]
+
+        prev = dict(self.flag_assignment)
+        current_flags = set(flags)
+        for name, pos in list(prev.items()):
+            if pos not in current_flags:
+                prev.pop(name, None)
+
+        entry_dists = {}
+        if self.boundary_ys:
+            for fpos in flags:
+                best = None
+                for y in self.boundary_ys:
+                    entry = (self.our_boundary_x, y)
+                    path = self._route(entry, fpos, restrict_safe=True)
+                    if not path:
+                        path = self._route(entry, fpos, restrict_safe=False)
+                    if not path:
+                        continue
+                    dist = len(path) - 1
+                    if best is None or dist < best:
+                        best = dist
+                entry_dists[fpos] = best if best is not None else 10**6
+
+        cost = {}
+        for p in attackers:
+            start = self._pos(p)
+            for fpos in flags:
+                path = self._route(start, fpos, restrict_safe=False)
+                dist = (len(path) - 1) if path else 10**6
+                entry_dist = entry_dists.get(fpos, dist)
+                dist_term = 0.35 * dist + 0.65 * entry_dist
+                risk = self._risk_score(fpos, opponents_enemy_side)
+                switch = 0.0
+                if p["name"] in prev and prev[p["name"]] != fpos:
+                    switch = self.switch_penalty
+
+                boundary_dist = abs(int(fpos[0]) - int(self.our_boundary_x))
+                boundary_bonus = 0.0
+                if boundary_dist <= int(self.flag_boundary_pref_dist_near):
+                    boundary_bonus = self.flag_boundary_pref_bonus_near
+                elif boundary_dist <= int(self.flag_boundary_pref_dist):
+                    boundary_bonus = self.flag_boundary_pref_bonus
+
+                cost[(p["name"], fpos)] = dist_term + self.flag_risk_weight * risk + switch - boundary_bonus
+
+        best_total = None
+        best_assignment = {}
+        for perm in itertools.permutations(flags, len(attackers)):
+            total = 0.0
+            for p, fpos in zip(attackers, perm):
+                total += cost[(p["name"], fpos)]
+                if best_total is not None and total >= best_total:
+                    break
+            else:
+                if best_total is None or total < best_total:
+                    best_total = total
+                    best_assignment = {p["name"]: fpos for p, fpos in zip(attackers, perm)}
+
+        return best_assignment
+
     def _plan_active_bait(self, my_free, opponents_free, enemy_flags):
         actions = {}
         reserved = set()
@@ -461,13 +549,20 @@ class EliteCTFAI_NT2(EliteCTFAI_NT):
             dist = len(path) - 1
             if limit is not None and dist > limit:
                 continue
-            candidates.append((dist, o, path))
+            escape_steps = None
+            if self.boundary_ys:
+                escape_steps = self._min_steps_any(o_pos, self._boundary_entries(), restrict_safe=False)
+            if escape_steps is None:
+                escape_steps = 10**6
+            if dist > escape_steps + int(self.carrier_chase_catch_slack):
+                continue
+            candidates.append((dist, escape_steps, o, path))
 
         if not candidates:
             return None
 
-        candidates.sort(key=lambda item: (item[0], item[1]["name"]))
-        _dist, target, path = candidates[0]
+        candidates.sort(key=lambda item: (item[0], item[1], item[2]["name"]))
+        _dist, _escape, target, path = candidates[0]
         return target, path
 
     def _move_carrier(self, player, opponents, targets):

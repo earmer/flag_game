@@ -14,7 +14,7 @@
     "learning_rate": 0.0003,
     "batch_size": 512,
     "epochs": 4,
-    "rollout_steps": 2048,
+    "rollout_steps": 512,
     "max_grad_norm": 1.0
   },
   "training": {
@@ -22,6 +22,8 @@
     "save_every_updates": 5,
     "epsilon": 0.05,
     "reward_divide_by_players": 1.0,
+    "num_envs": 4,
+    "sim_threads": 4,
     "historical_opponent": {
       "use_prob": 0.35,
       "min_pool": 2,
@@ -47,7 +49,7 @@
     "num_obstacles_1": 8,
     "num_obstacles_2": 4,
     "seed": 0,
-    "max_steps": 2048
+    "max_steps": 512
   },
   "checkpoint_path": "checkpoints/latest.pt"
 }
