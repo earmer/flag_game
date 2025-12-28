@@ -16,7 +16,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.append(str(BACKEND_DIR))
 
-from PPO.selfplay_env import CTFFrontendRulesEnv  # noqa: E402
+from engine_selfplay_env import CTFGameEngineSelfPlayEnv  # noqa: E402
 
 from model import ACTION_COUNT, TreePPOPolicy  # noqa: E402
 from reward import RewardTracker  # noqa: E402
@@ -63,6 +63,13 @@ def render_progress(step: int, total: int, *, prefix: str) -> None:
     filled = int(bar_len * step / max(1, total))
     bar = "=" * filled + "-" * (bar_len - filled)
     print(f"\r{prefix} [{bar}] {step}/{total}", end="", flush=True)
+
+def _ensure_dict(payload: Any) -> dict:
+    if isinstance(payload, str):
+        return json.loads(payload)
+    if isinstance(payload, dict):
+        return payload
+    return dict(payload)
 
 
 def ai_actions_to_env(actions_ai: np.ndarray, *, encoder: TeamHistoryStateEncoder) -> list[int]:
@@ -218,7 +225,7 @@ def evaluate_vs_pick_flag_ai(
 ) -> float:
     import pick_flag_ai
 
-    eval_env = CTFFrontendRulesEnv(env_cfg)
+    eval_env = CTFGameEngineSelfPlayEnv(env_cfg)
     encoder_L = TeamHistoryStateEncoder(
         width=eval_env.width,
         height=eval_env.height,
@@ -233,7 +240,7 @@ def evaluate_vs_pick_flag_ai(
     for _ in range(int(episodes)):
         obs_L, obs_R = eval_env.reset()
         encoder_L.reset_history()
-        pick_flag_ai.start_game(eval_env.init_req["R"])
+        pick_flag_ai.start_game(_ensure_dict(eval_env.init_req["R"]))
 
         done = False
         while not done:
@@ -244,8 +251,8 @@ def evaluate_vs_pick_flag_ai(
             actions_ai_L = _select_greedy_actions(model, obs_L_batch, active_L, device=device)
             actions_env_L = ai_actions_to_env(actions_ai_L, encoder=encoder_L)
 
-            moves_R = pick_flag_ai.plan_next_actions(obs_R) or {}
-            players_R = list(obs_R.get("myteamPlayer") or [])
+            moves_R = pick_flag_ai.plan_next_actions(_ensure_dict(obs_R)) or {}
+            players_R = list(_ensure_dict(obs_R).get("myteamPlayer") or [])
             actions_env_R = _moves_to_env_actions(moves_R, players_R)
 
             obs_L, obs_R, done = eval_env.step(actions_env_L, actions_env_R)
@@ -313,16 +320,17 @@ def main() -> None:
     torch.manual_seed(seed)
 
     device = select_device()
-    env = CTFFrontendRulesEnv(env_cfg)
+    env = CTFGameEngineSelfPlayEnv(env_cfg)
 
     LOGGER.info(
-        "Launcher config: env=%sx%s players=%s depth=%s history=%s seed=%s",
+        "Launcher config: engine=MockEnvVNew env=%sx%s players=%s depth=%s history=%s seed=%s init_path=%s",
         env.width,
         env.height,
         env.num_players,
         model_cfg.get("depth"),
         model_cfg.get("history_len"),
         training_cfg.get("seed"),
+        env_cfg.get("init_path"),
     )
 
     encoder_L = TeamHistoryStateEncoder(
