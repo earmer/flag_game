@@ -575,6 +575,7 @@ class EliteCTFAI_NT(EliteCTFAI):
                 reserved |= prison_reserved
                 runners = [p for p in runners if p["name"] not in reserved]
 
+        defended_intruders = False
         if not intruder_carriers and intruders and runners:
             allow_lure = False
             if len(runners) >= 3 and self._lure_is_reasonable(req, my_flags):
@@ -586,11 +587,13 @@ class EliteCTFAI_NT(EliteCTFAI):
                 actions.update(lure_actions)
                 reserved |= lure_reserved
                 runners = [p for p in runners if p["name"] not in reserved]
+                defended_intruders = bool(lure_reserved)
             else:
                 intruder_actions, intruder_reserved = self._plan_chase_intruder(runners, intruders, my_flags)
                 actions.update(intruder_actions)
                 reserved |= intruder_reserved
                 runners = [p for p in runners if p["name"] not in reserved]
+                defended_intruders = bool(intruder_reserved)
 
         if doomed_names and runners and not intruder_carriers:
             bait_actions, bait_reserved = self._plan_safe_bait(runners, opponents_free, avoid_lane_y=avoid_lane_y)
@@ -598,7 +601,7 @@ class EliteCTFAI_NT(EliteCTFAI):
             reserved |= bait_reserved
             runners = [p for p in runners if p["name"] not in reserved]
 
-        threat_present = bool(intruder_carriers) or (bool(intruders) and my_score >= opponent_score)
+        threat_present = bool(intruder_carriers) or (defended_intruders and my_score >= opponent_score)
         if (
             self.guard_enabled
             and threat_present
