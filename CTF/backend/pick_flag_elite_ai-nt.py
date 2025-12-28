@@ -599,7 +599,7 @@ class EliteCTFAI_NT(EliteCTFAI):
             reserved.add(stager["name"])
 
         remaining = [p for p in runners if p["name"] not in reserved]
-        if self.guard_post is not None and remaining and len(runners) >= 4:
+        if self.guard_post is not None and remaining and len(runners) >= self.lure_min_runners + 1:
             guard_stage = self._staging_cell(self.guard_post[1], max_depth=self.lure_stage_depth)
             if guard_stage is not None:
                 backstop, path = self._closest_runner_to_cell(remaining, guard_stage)
