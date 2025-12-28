@@ -39,6 +39,17 @@ class EliteCTFAI_NT2(EliteCTFAI_NT):
 
         self.double_team_advantage_margin = 2
 
+        self.critical_flag_guard_floor = 1
+        self.critical_flag_guard_targets = 2
+
+        self.carrier_chase_radius = 4
+        self.carrier_chase_min_ticks = 30
+        self._carrier_chase = {}
+
+    def start_game(self, req):
+        super().start_game(req)
+        self._carrier_chase = {}
+
     def _defense_delta(self):
         return -1 if self.my_side_is_left else 1
 
@@ -363,6 +374,170 @@ class EliteCTFAI_NT2(EliteCTFAI_NT):
 
         return actions, reserved
 
+    def _plan_defend_my_flags(
+        self,
+        runners,
+        my_flags,
+        opponents_free,
+        enemy_flags,
+        *,
+        my_score,
+        opponent_score,
+        min_defenders=0,
+    ):
+        actions = {}
+        reserved = set()
+
+        if not self.endgame_defense_enabled:
+            return actions, reserved
+        if not runners or not my_flags:
+            return actions, reserved
+        if len(my_flags) > self.endgame_flags_left:
+            return actions, reserved
+
+        min_attackers = int(self.endgame_min_attackers)
+        if my_score < opponent_score and len(runners) >= 3:
+            min_attackers = max(min_attackers, 2)
+        if not enemy_flags:
+            min_attackers = 0
+
+        defenders_budget = max(min_defenders, len(runners) - min_attackers)
+        defenders_budget = min(defenders_budget, len(runners))
+        if defenders_budget <= 0:
+            return actions, reserved
+
+        flag_positions = [self._flag_pos(f) for f in my_flags]
+        opponents_on_our_side = [self._pos(o) for o in opponents_free if self._is_safe(self._pos(o))]
+
+        def threat_steps(flag_pos):
+            steps = self._min_steps_from_any(opponents_on_our_side, flag_pos, restrict_safe=True)
+            return steps if steps is not None else 10**6
+
+        threat_by_flag = {pos: threat_steps(pos) for pos in flag_positions}
+
+        defender_candidates = []
+        for p in runners:
+            p_pos = self._pos(p)
+            best_flag = None
+            best_path = None
+            best_threat = None
+            for fpos in flag_positions:
+                path = self._route(p_pos, fpos, restrict_safe=True)
+                if not path:
+                    continue
+                steps = len(path) - 1
+                threat = threat_by_flag.get(fpos, 10**6)
+                score = (steps, threat)
+                if best_path is None or score < (len(best_path) - 1, best_threat):
+                    best_flag = fpos
+                    best_path = path
+                    best_threat = threat
+            if best_flag is None or best_path is None:
+                continue
+            defender_candidates.append((len(best_path) - 1, best_threat, p, best_flag, best_path))
+
+        defender_candidates.sort(key=lambda item: (item[0], item[1]))
+        for _steps, _threat, p, _flag, path in defender_candidates[:defenders_budget]:
+            move = self._next_move(self._pos(p), path)
+            if move:
+                actions[p["name"]] = move
+            reserved.add(p["name"])
+
+        return actions, reserved
+
+    def _carrier_catch_candidate(self, start, opponents, *, allow_long=False):
+        if not self._is_safe(start):
+            return None
+
+        limit = None if allow_long else int(self.carrier_chase_radius)
+        candidates = []
+        for o in opponents or []:
+            o_pos = self._pos(o)
+            if not self._is_safe(o_pos):
+                continue
+            path = self._route(start, o_pos, restrict_safe=True)
+            if not path:
+                continue
+            dist = len(path) - 1
+            if limit is not None and dist > limit:
+                continue
+            candidates.append((dist, o, path))
+
+        if not candidates:
+            return None
+
+        candidates.sort(key=lambda item: (item[0], item[1]["name"]))
+        _dist, target, path = candidates[0]
+        return target, path
+
+    def _move_carrier(self, player, opponents, targets):
+        start = self._pos(player)
+        name = player["name"]
+
+        if not self._is_safe(start):
+            self._carrier_chase.pop(name, None)
+
+        opponents_by_name = {o["name"]: o for o in opponents or []}
+        chase_state = self._carrier_chase.get(name)
+
+        if self._is_safe(start):
+            move = None
+            target_obj = None
+            target_pos = None
+
+            if chase_state:
+                target_obj = opponents_by_name.get(chase_state.get("target"))
+                if target_obj is not None:
+                    target_pos = self._pos(target_obj)
+                elif "last_pos" in chase_state:
+                    target_pos = chase_state["last_pos"]
+
+                if target_pos is not None:
+                    path = self._route(start, target_pos, restrict_safe=True)
+                    move = self._next_move(start, path)
+
+                if move:
+                    chase_state["last_pos"] = target_pos
+                    return move
+
+                if self.tick > int(chase_state.get("until", -1)):
+                    self._carrier_chase.pop(name, None)
+                else:
+                    candidate = self._carrier_catch_candidate(start, opponents, allow_long=True)
+                    if candidate:
+                        target_obj, path = candidate
+                        self._carrier_chase[name] = {
+                            "target": target_obj["name"],
+                            "until": chase_state.get("until", self.tick) + 1,
+                            "last_pos": self._pos(target_obj),
+                        }
+                        move = self._next_move(start, path)
+                        if move:
+                            return move
+
+            if chase_state is None:
+                candidate = self._carrier_catch_candidate(start, opponents, allow_long=False)
+                if candidate:
+                    target_obj, path = candidate
+                    self._carrier_chase[name] = {
+                        "target": target_obj["name"],
+                        "until": self.tick + int(self.carrier_chase_min_ticks),
+                        "last_pos": self._pos(target_obj),
+                    }
+                    move = self._next_move(start, path)
+                    if move:
+                        return move
+
+        doomed = self._escape_almost_impossible(start, opponents)
+        if doomed:
+            self._doomed_this_tick.add(player["name"])
+            _entry, path = self._best_boundary_entry_path(start, opponents)
+            move = self._next_move(start, path)
+            if move:
+                return move
+
+        return super()._move_carrier(player, opponents, targets)
+
     def plan_next_actions(self, req):
         if not self.world.update(req):
             return {}
@@ -408,6 +583,17 @@ class EliteCTFAI_NT2(EliteCTFAI_NT):
             o for o in opponents_free if (not o.get("hasFlag")) and self._is_safe(self._pos(o))
         ]
 
+        critical_flags = (
+            self.endgame_defense_enabled
+            and my_flags
+            and len(my_flags) <= self.endgame_flags_left
+        )
+        intruders_on_our_side = bool(intruder_carriers or intruders)
+        critical_guard_needed = 0
+        if critical_flags:
+            guard_targets = self.critical_flag_guard_targets if intruders_on_our_side else self.critical_flag_guard_floor
+            critical_guard_needed = min(len(my_flags), int(guard_targets))
+
         if intruder_carriers and runners:
             defense_actions, defense_reserved = self._plan_trap_on_carriers(
                 runners,
@@ -444,7 +630,8 @@ class EliteCTFAI_NT2(EliteCTFAI_NT):
                     break
 
         need_prison_ready = bool(my_prisoners) or bool(doomed_names)
-        if need_prison_ready and prisons and runners:
+        can_spare_for_prison = len(runners) - critical_guard_needed
+        if need_prison_ready and prisons and runners and can_spare_for_prison > 0:
             if not any(self._pos(p) in prisons for p in my_free):
                 prison_actions, prison_reserved = self._plan_prison_ready(runners, prisons)
                 actions.update(prison_actions)
@@ -509,6 +696,7 @@ class EliteCTFAI_NT2(EliteCTFAI_NT):
                 enemy_flags,
                 my_score=my_score,
                 opponent_score=opponent_score,
+                min_defenders=critical_guard_needed,
             )
             actions.update(defense_actions)
             reserved |= defense_reserved
@@ -639,4 +827,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
