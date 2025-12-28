@@ -43,7 +43,7 @@
     "num_flags": 6,
     "move_speed_ms": 300.0,
     "prison_duration_ms": 20000.0,
-    "use_random_flags": false,
+    "use_random_flags": true,
     "num_obstacles_1": 8,
     "num_obstacles_2": 4,
     "seed": 0,

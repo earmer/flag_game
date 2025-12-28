@@ -27,12 +27,20 @@ class EliteCTFAI_NT(EliteCTFAI):
 
         self.bait_enabled = True
         self.bait_min_enemy_dist = 3
+        self.bait_persist_ticks = 6
 
         self.endgame_defense_enabled = True
         self.endgame_flags_left = 3
         self.endgame_min_attackers = 1
 
+        self.double_team_max_margin = 1
+
         self._doomed_this_tick = set()
+        self._baiting = None
+
+    def start_game(self, req):
+        super().start_game(req)
+        self._baiting = None
 
     def _flag_pos(self, flag):
         return (int(flag["posX"]), int(flag["posY"]))
@@ -166,6 +174,8 @@ class EliteCTFAI_NT(EliteCTFAI):
 
         if not self.bait_enabled:
             return actions, reserved
+        if self._baiting is not None:
+            return actions, reserved
         if not runners or not self.boundary_ys:
             return actions, reserved
 
@@ -209,6 +219,13 @@ class EliteCTFAI_NT(EliteCTFAI):
             return actions, reserved
 
         runner, entry_safe = best
+        self._baiting = {
+            "name": runner["name"],
+            "lane_y": entry_safe[1],
+            "ticks_left": int(self.bait_persist_ticks),
+            "towards_enemy": True,
+        }
+
         runner_pos = self._pos(runner)
         if runner_pos == entry_safe:
             actions[runner["name"]] = cross_move
@@ -220,6 +237,89 @@ class EliteCTFAI_NT(EliteCTFAI):
         if move:
             actions[runner["name"]] = move
         reserved.add(runner["name"])
+        return actions, reserved
+
+    def _plan_active_bait(self, my_free, opponents_free):
+        actions = {}
+        reserved = set()
+
+        if not self.bait_enabled:
+            return actions, reserved
+        if not self._baiting:
+            return actions, reserved
+        if not self.boundary_ys:
+            self._baiting = None
+            return actions, reserved
+
+        name = self._baiting.get("name")
+        lane_y = self._baiting.get("lane_y")
+        ticks_left = int(self._baiting.get("ticks_left") or 0)
+        towards_enemy = bool(self._baiting.get("towards_enemy", True))
+
+        if not name or lane_y is None or ticks_left <= 0:
+            self._baiting = None
+            return actions, reserved
+
+        player = None
+        for p in my_free or []:
+            if p["name"] == name:
+                player = p
+                break
+        if player is None or player.get("inPrison") or player.get("hasFlag"):
+            self._baiting = None
+            return actions, reserved
+
+        entry_safe = (self.our_boundary_x, int(lane_y))
+        bait_cell = (self.enemy_boundary_x, int(lane_y))
+        if entry_safe in self.world.walls or bait_cell in self.world.walls:
+            self._baiting = None
+            return actions, reserved
+
+        cross_move = "right" if self.my_side_is_left else "left"
+        return_move = "left" if self.my_side_is_left else "right"
+
+        opponents_enemy_side = [
+            self._pos(o) for o in opponents_free if not self._is_safe(self._pos(o))
+        ]
+        enemy_dist = self._min_steps_from_any(opponents_enemy_side, bait_cell, restrict_safe=False)
+        if enemy_dist is None:
+            enemy_dist = 10**6
+        safe_to_cross = enemy_dist >= self.bait_min_enemy_dist
+
+        start = self._pos(player)
+        move = None
+        if not self._is_safe(start):
+            if start == bait_cell:
+                move = return_move
+                towards_enemy = True
+            else:
+                path = self._route(start, bait_cell, restrict_safe=False)
+                move = self._next_move(start, path) or return_move
+        else:
+            if not safe_to_cross:
+                if start != entry_safe:
+                    path = self._route(start, entry_safe, restrict_safe=True)
+                    move = self._next_move(start, path)
+            else:
+                if start == entry_safe:
+                    if towards_enemy:
+                        move = cross_move
+                        towards_enemy = False
+                else:
+                    path = self._route(start, entry_safe, restrict_safe=True)
+                    move = self._next_move(start, path)
+
+        if move:
+            actions[name] = move
+        reserved.add(name)
+
+        ticks_left -= 1
+        if ticks_left <= 0:
+            self._baiting = None
+        else:
+            self._baiting["ticks_left"] = ticks_left
+            self._baiting["towards_enemy"] = towards_enemy
+
         return actions, reserved
 
     def _plan_defend_my_flags(self, runners, my_flags, opponents_free, enemy_flags, *, my_score, opponent_score):
@@ -250,32 +350,35 @@ class EliteCTFAI_NT(EliteCTFAI):
             steps = self._min_steps_from_any(opponents_on_our_side, flag_pos, restrict_safe=True)
             return steps if steps is not None else 10**6
 
-        flag_positions.sort(key=threat_steps)
+        threat_by_flag = {pos: threat_steps(pos) for pos in flag_positions}
 
-        available = list(runners)
-        for flag_pos in flag_positions:
-            if defenders_budget <= 0 or not available:
-                break
-
-            best_runner = None
+        defender_candidates = []
+        for p in runners:
+            p_pos = self._pos(p)
+            best_flag = None
             best_path = None
-            for p in available:
-                path = self._route(self._pos(p), flag_pos, restrict_safe=True)
+            best_threat = None
+            for fpos in flag_positions:
+                path = self._route(p_pos, fpos, restrict_safe=True)
                 if not path:
                     continue
-                if best_path is None or len(path) < len(best_path):
+                steps = len(path) - 1
+                threat = threat_by_flag.get(fpos, 10**6)
+                score = (steps, threat)
+                if best_path is None or score < (len(best_path) - 1, best_threat):
+                    best_flag = fpos
                     best_path = path
-                    best_runner = p
-
-            if best_runner is None or best_path is None:
+                    best_threat = threat
+            if best_flag is None or best_path is None:
                 continue
+            defender_candidates.append((len(best_path) - 1, best_threat, p, best_flag, best_path))
 
-            move = self._next_move(self._pos(best_runner), best_path)
+        defender_candidates.sort(key=lambda item: (item[0], item[1]))
+        for _steps, _threat, p, _flag, path in defender_candidates[:defenders_budget]:
+            move = self._next_move(self._pos(p), path)
             if move:
-                actions[best_runner["name"]] = move
-            reserved.add(best_runner["name"])
-            available = [p for p in available if p["name"] != best_runner["name"]]
-            defenders_budget -= 1
+                actions[p["name"]] = move
+            reserved.add(p["name"])
 
         return actions, reserved
 
@@ -458,6 +561,7 @@ class EliteCTFAI_NT(EliteCTFAI):
             primary_path = None
             secondary = None
             secondary_path = None
+            secondary_margin = None
 
             if chase_margin is not None and chase_margin <= 0:
                 primary = chaser
@@ -479,9 +583,11 @@ class EliteCTFAI_NT(EliteCTFAI):
                 if kind == "chase":
                     secondary = blocker
                     secondary_path = blocker_path
+                    secondary_margin = block_margin
                 else:
                     secondary = chaser
                     secondary_path = chase_path
+                    secondary_margin = chase_margin
 
             if primary is None or primary_path is None:
                 continue
@@ -494,6 +600,8 @@ class EliteCTFAI_NT(EliteCTFAI):
 
             urgent = escape_dist is not None and escape_dist <= 2
             allow_double_team = urgent or len(runners) >= 4
+            if not urgent and secondary_margin is not None and secondary_margin > self.double_team_max_margin:
+                continue
             if not allow_double_team or not available or secondary is None or secondary_path is None:
                 continue
             if secondary["name"] not in {p["name"] for p in available}:
@@ -669,6 +777,9 @@ class EliteCTFAI_NT(EliteCTFAI):
             if self._escape_almost_impossible(p_pos, opponents_free):
                 doomed_names.add(p["name"])
 
+        if not doomed_names:
+            self._baiting = None
+
         avoid_lane_y = None
         if doomed_names:
             for p in my_free:
@@ -710,7 +821,18 @@ class EliteCTFAI_NT(EliteCTFAI):
                 runners = [p for p in runners if p["name"] not in reserved]
                 defended_intruders = bool(intruder_reserved)
 
-        if doomed_names and runners and not intruder_carriers:
+        baiter_name = self._baiting.get("name") if self._baiting else None
+        if baiter_name and not intruder_carriers:
+            runner_names = {p["name"] for p in runners}
+            if baiter_name in runner_names:
+                bait_actions, bait_reserved = self._plan_active_bait(my_free, opponents_free)
+                actions.update(bait_actions)
+                reserved |= bait_reserved
+                runners = [p for p in runners if p["name"] not in reserved]
+            else:
+                self._baiting = None
+
+        if doomed_names and runners and not intruder_carriers and self._baiting is None:
             bait_actions, bait_reserved = self._plan_safe_bait(runners, opponents_free, avoid_lane_y=avoid_lane_y)
             actions.update(bait_actions)
             reserved |= bait_reserved
