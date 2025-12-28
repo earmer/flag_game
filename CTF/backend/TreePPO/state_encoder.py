@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
-from typing import Any, List, Mapping, Sequence, Tuple
+import json
+from typing import Any, List, Mapping, Sequence, Tuple, Union
 
 import numpy as np
 
@@ -61,7 +62,9 @@ class TeamHistoryStateEncoder:
         geom = self._geometry
         return bool(geom and geom.mirror_x)
 
-    def start_game(self, init_req: Mapping[str, Any]) -> None:
+    def start_game(self, init_req: Union[Mapping[str, Any], str]) -> None:
+        if isinstance(init_req, str):
+            init_req = json.loads(init_req)
         map_data = init_req.get("map") or {}
         self.width = int(map_data.get("width", self.width))
         self.height = int(map_data.get("height", self.height))
@@ -116,7 +119,11 @@ class TeamHistoryStateEncoder:
 
         return grid
 
-    def encode_team(self, status_req: Mapping[str, Any]) -> Tuple[np.ndarray, List[Mapping[str, Any]], np.ndarray]:
+    def encode_team(
+        self, status_req: Union[Mapping[str, Any], str]
+    ) -> Tuple[np.ndarray, List[Mapping[str, Any]], np.ndarray]:
+        if isinstance(status_req, str):
+            status_req = json.loads(status_req)
         if self._static_grid is None:
             return np.zeros((0, 0, 0, 0), dtype=np.float32), [], np.zeros((0,), dtype=np.float32)
 
@@ -213,4 +220,3 @@ def _one_hot_12(grid: np.ndarray) -> np.ndarray:
     for idx in range(12):
         planes[idx] = (grid == idx).astype(np.float32)
     return planes
-
